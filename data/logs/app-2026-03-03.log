@@ -1,0 +1,32 @@
+{"time":"2026-03-03T15:03:09.327832+08:00","level":"INFO","msg":"Application starting..."}
+{"time":"2026-03-03T15:03:09.327951+08:00","level":"INFO","msg":"Initializing database","path":"/Users/joker/Code/GoT0Emergency/data/db/app.db"}
+{"time":"2026-03-03T15:03:23.429469+08:00","level":"INFO","msg":"Application starting..."}
+{"time":"2026-03-03T15:03:23.429761+08:00","level":"INFO","msg":"Initializing database","path":"/Users/joker/Code/GoT0Emergency/data/db/app.db"}
+{"time":"2026-03-03T15:04:03.714881+08:00","level":"INFO","msg":"Application starting..."}
+{"time":"2026-03-03T15:04:03.715147+08:00","level":"INFO","msg":"Initializing database","path":"/Users/joker/Code/GoT0Emergency/data/db/app.db"}
+{"time":"2026-03-03T15:04:03.853383+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:04:03.853827+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}
+{"time":"2026-03-03T15:04:03.854331+08:00","level":"INFO","msg":"Cleaning up old metrics","retention_hours":24,"cutoff":"2026-03-02T15:04:03.85433+08:00"}
+{"time":"2026-03-03T15:04:03.85442+08:00","level":"INFO","msg":"Cleaned up old metrics","deleted_rows":0}
+{"time":"2026-03-03T15:05:03.854813+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:05:03.855481+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}
+{"time":"2026-03-03T15:05:17.793806+08:00","level":"INFO","msg":"Host not connected, attempting auto-connect","host_id":1}
+{"time":"2026-03-03T15:05:17.794108+08:00","level":"INFO","msg":"Connecting to host via SSH","host":"192.168.64.4","ip":"192.168.64.4","port":22}
+{"time":"2026-03-03T15:05:22.794828+08:00","level":"ERROR","msg":"Failed to connect to host","host":"192.168.64.4","err":"dial tcp 192.168.64.4:22: i/o timeout"}
+{"time":"2026-03-03T15:05:22.794902+08:00","level":"INFO","msg":"Host not connected, attempting auto-connect","host_id":1}
+{"time":"2026-03-03T15:05:22.795089+08:00","level":"INFO","msg":"Connecting to host via SSH","host":"192.168.64.4","ip":"192.168.64.4","port":22}
+{"time":"2026-03-03T15:05:27.796426+08:00","level":"ERROR","msg":"Failed to connect to host","host":"192.168.64.4","err":"dial tcp 192.168.64.4:22: i/o timeout"}
+{"time":"2026-03-03T15:05:27.796647+08:00","level":"INFO","msg":"Host not connected, attempting auto-connect","host_id":1}
+{"time":"2026-03-03T15:05:27.796704+08:00","level":"INFO","msg":"Host not connected, attempting auto-connect","host_id":1}
+{"time":"2026-03-03T15:05:27.797189+08:00","level":"INFO","msg":"Connecting to host via SSH","host":"192.168.64.4","ip":"192.168.64.4","port":22}
+{"time":"2026-03-03T15:05:32.798549+08:00","level":"ERROR","msg":"Failed to connect to host","host":"192.168.64.4","err":"dial tcp 192.168.64.4:22: i/o timeout"}
+{"time":"2026-03-03T15:05:32.798976+08:00","level":"INFO","msg":"Connecting to host via SSH","host":"192.168.64.4","ip":"192.168.64.4","port":22}
+{"time":"2026-03-03T15:05:37.800723+08:00","level":"ERROR","msg":"Failed to connect to host","host":"192.168.64.4","err":"dial tcp 192.168.64.4:22: i/o timeout"}
+{"time":"2026-03-03T15:06:03.855099+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:06:03.855838+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}
+{"time":"2026-03-03T15:07:03.855254+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:07:03.856114+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}
+{"time":"2026-03-03T15:08:03.854983+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:08:03.855607+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}
+{"time":"2026-03-03T15:09:03.855316+08:00","level":"INFO","msg":"Starting scheduled metrics collection"}
+{"time":"2026-03-03T15:09:03.857521+08:00","level":"ERROR","msg":"Failed to check host in background","host_id":1,"err":"host not connected"}

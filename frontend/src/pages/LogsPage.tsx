@@ -1,0 +1,245 @@
+import { useState, useEffect, useMemo } from "react";
+import { PageContainer } from "../components/layout/PageContainer";
+import { PageHeader } from "../components/layout/PageHeader";
+import { Card, CardContent } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { RefreshCw, Trash2, Calendar, Search, Filter } from "lucide-react";
+// @ts-ignore
+import { GetLogsByDate, GetLogFiles, ClearLogs } from "../../wailsjs/go/app/App";
+
+interface LogEntry {
+    time: string;
+    level: string;
+    msg: string;
+    [key: string]: any;
+}
+
+const MODULES = [
+    { label: "所有模块", value: "all" },
+    { label: "系统", keywords: ["app", "init", "start"] },
+    { label: "数据库", keywords: ["db", "database", "sqlite", "sql"] },
+    { label: "主机", keywords: ["host", "ssh", "connect"] },
+    { label: "节点", keywords: ["node", "plugin", "deploy"] },
+    { label: "监控", keywords: ["monitor", "status", "metric"] },
+    { label: "终端", keywords: ["terminal", "pty", "shell"] },
+];
+
+export function LogsPage() {
+    const [rawLogs, setRawLogs] = useState<string[]>([]);
+    const [dates, setDates] = useState<string[]>([]);
+    const [selectedDate, setSelectedDate] = useState<string>('');
+    const [loading, setLoading] = useState(false);
+    
+    // Filters
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedModule, setSelectedModule] = useState("all");
+
+    useEffect(() => {
+        loadDates();
+    }, []);
+
+    useEffect(() => {
+        if (selectedDate) {
+            loadLogs(selectedDate);
+        }
+    }, [selectedDate]);
+
+    const loadDates = async () => {
+        try {
+            const result = await GetLogFiles();
+            setDates(result || []);
+            // Default to today or the latest available date
+            const today = new Date().toISOString().split('T')[0];
+            if (result && result.includes(today)) {
+                setSelectedDate(today);
+            } else if (result && result.length > 0) {
+                setSelectedDate(result[result.length - 1]);
+            }
+        } catch (err) {
+            console.error("Failed to load log dates:", err);
+        }
+    };
+
+    const loadLogs = async (date: string) => {
+        if (!date) return;
+        setLoading(true);
+        try {
+            const data = await GetLogsByDate(date, 2000); // Increased limit
+            setRawLogs(data || []);
+        } catch (err) {
+            console.error("Failed to load logs:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClear = async () => {
+        if (!confirm("确定要清空所有日志吗？")) return;
+        
+        try {
+            await ClearLogs();
+            loadLogs(selectedDate); // Reload current
+        } catch (err) {
+            console.error("Failed to clear logs:", err);
+            alert("清空日志失败: " + err);
+        }
+    };
+
+    // Parse and Filter Logs
+    const filteredLogs = useMemo(() => {
+        return rawLogs
+            .map(line => {
+                try {
+                    return JSON.parse(line) as LogEntry;
+                } catch {
+                    // Fallback for non-JSON lines
+                    return { time: "", level: "UNKNOWN", msg: line } as LogEntry;
+                }
+            })
+            .filter(log => {
+                // 1. Module Filter
+                if (selectedModule !== "all") {
+                    const moduleConfig = MODULES.find(m => m.value === selectedModule || m.label === selectedModule); // simple matching
+                    if (moduleConfig && moduleConfig.keywords) {
+                        const content = JSON.stringify(log).toLowerCase();
+                        const hasKeyword = moduleConfig.keywords.some(k => content.includes(k));
+                        if (!hasKeyword) return false;
+                    }
+                }
+
+                // 2. Search Query
+                if (searchQuery) {
+                    const query = searchQuery.toLowerCase();
+                    const content = JSON.stringify(log).toLowerCase();
+                    return content.includes(query);
+                }
+
+                return true;
+            })
+            .reverse(); // Show newest first
+    }, [rawLogs, selectedModule, searchQuery]);
+
+    const getLevelColor = (level: string) => {
+        switch (level?.toUpperCase()) {
+            case "INFO": return "text-blue-400";
+            case "WARN": return "text-yellow-400";
+            case "ERROR": return "text-red-400";
+            case "DEBUG": return "text-gray-400";
+            default: return "text-white";
+        }
+    };
+
+    return (
+        <PageContainer className="space-y-4">
+            <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                    <PageHeader title="日志管理" description="查看和管理系统日志" />
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => loadLogs(selectedDate)} disabled={loading || !selectedDate}>
+                            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                            刷新
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={handleClear}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            清空
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Toolbar */}
+                <Card className="p-3 bg-card/50">
+                    <div className="flex flex-wrap gap-4 items-center">
+                        {/* Date Selector */}
+                        <div className="flex items-center gap-2 min-w-[150px]">
+                            <Calendar size={16} className="text-muted-foreground" />
+                            <select 
+                                className="bg-background border rounded px-2 py-1 text-sm focus:outline-none w-full"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                            >
+                                {dates.length === 0 && <option value="">无日志</option>}
+                                {dates.map(date => (
+                                    <option key={date} value={date}>{date}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Module Selector */}
+                        <div className="flex items-center gap-2 min-w-[150px]">
+                            <Filter size={16} className="text-muted-foreground" />
+                            <select 
+                                className="bg-background border rounded px-2 py-1 text-sm focus:outline-none w-full"
+                                value={selectedModule}
+                                onChange={(e) => setSelectedModule(e.target.value)}
+                            >
+                                {MODULES.map(m => (
+                                    <option key={m.label} value={m.label}>{m.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="flex-1 flex items-center gap-2">
+                            <Search size={16} className="text-muted-foreground" />
+                            <Input 
+                                placeholder="搜索关键字..." 
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Log List */}
+            <Card className="flex-1 overflow-hidden flex flex-col min-h-[500px]">
+                <CardContent className="flex-1 p-0 overflow-hidden relative">
+                    <div className="absolute inset-0 overflow-auto p-0">
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead className="bg-muted/50 text-xs uppercase sticky top-0 z-10 backdrop-blur-sm">
+                                <tr>
+                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[180px]">时间</th>
+                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[80px]">级别</th>
+                                    <th className="px-4 py-2 font-medium text-muted-foreground">消息</th>
+                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[200px]">详情</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {filteredLogs.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                            没有找到匹配的日志。
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredLogs.map((log, index) => (
+                                        <tr key={index} className="hover:bg-muted/30 transition-colors group">
+                                            <td className="px-4 py-2 whitespace-nowrap text-muted-foreground font-mono text-xs">
+                                                {log.time ? new Date(log.time).toLocaleString() : '-'}
+                                            </td>
+                                            <td className={`px-4 py-2 font-bold text-xs ${getLevelColor(log.level)}`}>
+                                                {log.level || 'UNKNOWN'}
+                                            </td>
+                                            <td className="px-4 py-2 break-all font-mono text-xs">
+                                                {log.msg}
+                                            </td>
+                                            <td className="px-4 py-2 text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                                                {/* Render extra fields as badges or text */}
+                                                {Object.entries(log)
+                                                    .filter(([k]) => !['time', 'level', 'msg'].includes(k))
+                                                    .map(([k, v]) => `${k}=${v}`)
+                                                    .join(' ')}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+        </PageContainer>
+    );
+}
