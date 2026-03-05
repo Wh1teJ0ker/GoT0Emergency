@@ -15,6 +15,7 @@ import (
 	"GoT0Emergency/internal/infra/executor"
 	"GoT0Emergency/internal/infra/session"
 	hostMod "GoT0Emergency/internal/modules/host"
+	"GoT0Emergency/internal/modules/monitor/pdh"
 	"GoT0Emergency/internal/modules/settings"
 	"GoT0Emergency/internal/pkg/log"
 
@@ -138,10 +139,12 @@ type Service struct {
 	stopChan       chan struct{}
 	statusCache    map[int64]*HostStatus
 	mu             sync.RWMutex
+	pdhQuery       *pdh.PDHQuery // PDH query handle for Windows Queue Length
+	pdhCPUQuery    *pdh.PDHQuery // PDH query handle for Windows CPU Utility
 }
 
 func NewService(sm *session.SessionManager, le *executor.LocalExecutor, hs *hostMod.Service, set *settings.Service) *Service {
-	return &Service{
+	s := &Service{
 		sessionManager: sm,
 		localExecutor:  le,
 		hostService:    hs,
@@ -149,6 +152,34 @@ func NewService(sm *session.SessionManager, le *executor.LocalExecutor, hs *host
 		stopChan:       make(chan struct{}),
 		statusCache:    make(map[int64]*HostStatus),
 	}
+
+	// Initialize PDH query if on Windows
+	if runtime.GOOS == "windows" {
+		q, err := pdh.NewProcessorQueueLengthQuery()
+		if err == nil {
+			s.pdhQuery = q
+			log.Info("PDH query initialized successfully for Processor Queue Length")
+		} else {
+			log.Error("Failed to initialize PDH Queue Length query: " + err.Error())
+		}
+		
+		q2, err := pdh.NewProcessorUtilityQuery()
+		if err == nil {
+			s.pdhCPUQuery = q2
+			log.Info("PDH query initialized successfully for Processor Utility")
+		} else {
+			// Try fallback to Processor Time
+			q3, err := pdh.NewPDHQuery("\\Processor(_Total)\\% Processor Time")
+			if err == nil {
+				s.pdhCPUQuery = q3
+				log.Info("PDH query initialized for Processor Time (fallback)")
+			} else {
+				log.Error("Failed to initialize PDH CPU query: " + err.Error())
+			}
+		}
+	}
+
+	return s
 }
 
 func (s *Service) Start() {
@@ -198,7 +229,7 @@ func (s *Service) collectAll() {
 	log.Info("Starting scheduled metrics collection")
 	hosts, err := s.hostService.GetHosts()
 	if err != nil {
-		log.Error("Failed to list hosts for monitoring", "err", err)
+		log.Error("Failed to list hosts for monitoring: " + err.Error())
 		return
 	}
 
@@ -208,7 +239,7 @@ func (s *Service) collectAll() {
 			continue // Skip local if it's in the list? Usually local is treated specially or not in DB.
 			// Assuming GetHosts returns only remote hosts from DB.
 		}
-		
+
 		// Run checks concurrently? Maybe limit concurrency.
 		// For now, serial is safer for resource usage, or use a worker pool.
 		// Given "Optimize speed", let's use a semaphore.
@@ -217,7 +248,7 @@ func (s *Service) collectAll() {
 			if err != nil {
 				// Log is handled inside CheckHost for critical errors? No, CheckHost returns error.
 				// We should log it here.
-				log.Error("Failed to check host in background", "host_id", hid, "err", err)
+				log.Error("Failed to check host in background: " + err.Error())
 			}
 		}(h.ID)
 	}
@@ -226,18 +257,18 @@ func (s *Service) collectAll() {
 func (s *Service) cleanup() {
 	hours := s.settings.GetRetentionHours()
 	cutoff := time.Now().Add(-time.Duration(hours) * time.Hour)
-	
-	log.Info("Cleaning up old metrics", "retention_hours", hours, "cutoff", cutoff)
+
+	log.Info(fmt.Sprintf("Cleaning up old metrics, retention_hours: %d, cutoff: %v", hours, cutoff))
 
 	query := "DELETE FROM host_metrics WHERE created_at < ?"
 	res, err := db.DB.Exec(query, cutoff)
 	if err != nil {
-		log.Error("Failed to clean up old metrics", "err", err)
+		log.Error("Failed to clean up old metrics: " + err.Error())
 		return
 	}
-	
+
 	count, _ := res.RowsAffected()
-	log.Info("Cleaned up old metrics", "deleted_rows", count)
+	log.Info("Cleaned up old metrics, deleted_rows: " + strconv.FormatInt(count, 10))
 }
 
 func (s *Service) CheckHost(hostID int64) (*HostStatus, error) {
@@ -296,7 +327,7 @@ func (s *Service) saveMetrics(hostID int64, status *HostStatus) {
 		status.Network.TotalTx,
 	)
 	if err != nil {
-		log.Error("Failed to save metrics", "host_id", hostID, "err", err)
+		log.Error("Failed to save metrics: " + err.Error())
 	}
 }
 
@@ -334,7 +365,7 @@ func (s *Service) GetHostMetrics(hostID int64, durationStr string) ([]MetricPoin
 		var memUsed, memTotal, diskUsed, diskTotal sql.NullInt64
 
 		if err := rows.Scan(&createdAt, &cpuUsage, &memUsed, &memTotal, &diskUsed, &diskTotal); err != nil {
-			log.Error("Failed to scan metric row", "err", err)
+			log.Error("Failed to scan metric row: " + err.Error())
 			continue
 		}
 
@@ -358,6 +389,13 @@ func (s *Service) GetHostMetrics(hostID int64, durationStr string) ([]MetricPoin
 
 func (s *Service) checkLocal() (*HostStatus, error) {
 	status := &HostStatus{}
+
+	// Force clear cache for local checks if we want truly "fresh" data,
+	// but CheckHost updates cache anyway.
+	// The issue might be CheckHostStatus in Wails calls GetStatus or CheckHost?
+	// App.go usually calls service.CheckHost.
+	// Let's add a log to verify it's being called.
+	// log.Debug("Checking local host status...")
 
 	// 1. System Info
 	hInfo, err := host.Info()
@@ -393,17 +431,62 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 		status.CPU.Frequency = cInfo[0].Mhz
 	}
 
-	cPercent, err := cpu.Percent(0, false)
-	if err == nil && len(cPercent) > 0 {
-		status.CPU.UsageTotal = cPercent[0]
-	}
-	cPercentCore, err := cpu.Percent(0, true)
+	// Calculate CPU usage
+	// Using a single call with interval to get per-core usage, then calculate total from it.
+	// This avoids blocking twice and ensures consistent data.
+	cPercentCore, err := cpu.Percent(500*time.Millisecond, true)
 	if err == nil {
 		status.CPU.UsagePerCore = cPercentCore
+		
+		// Calculate total usage as average of per-core usage
+		var totalUsage float64
+		for _, p := range cPercentCore {
+			totalUsage += p
+		}
+		if len(cPercentCore) > 0 {
+			status.CPU.UsageTotal = totalUsage / float64(len(cPercentCore))
+		}
+	} else {
+		// Fallback
+		cPercent, err := cpu.Percent(500*time.Millisecond, false)
+		if err == nil && len(cPercent) > 0 {
+			status.CPU.UsageTotal = cPercent[0]
+		}
 	}
-	lAvg, err := load.Avg()
-	if err == nil {
-		status.CPU.LoadAvg = fmt.Sprintf("%.2f, %.2f, %.2f", lAvg.Load1, lAvg.Load5, lAvg.Load15)
+	
+	// If on Windows and PDH is available, override Total Usage with PDH value (Task Manager style)
+	if runtime.GOOS == "windows" && s.pdhCPUQuery != nil {
+		val, err := s.pdhCPUQuery.Collect()
+		if err == nil {
+			// Cap at 100% just in case, although Utility can go > 100% on some systems with Turbo
+			// But for UI consistency, maybe cap it? Task Manager caps at 100%.
+			if val > 100 {
+				val = 100
+			}
+			status.CPU.UsageTotal = val
+		} else {
+			log.Error("PDH CPU Collect failed: " + err.Error())
+		}
+	}
+
+	if runtime.GOOS == "windows" && s.pdhQuery != nil {
+		// Use PDH for Processor Queue Length on Windows
+		qLen, err := s.pdhQuery.Collect()
+		if err == nil {
+			status.CPU.LoadAvg = fmt.Sprintf("%.0f (Queue Length)", qLen)
+		} else {
+			// Try re-initializing if failed?
+			// For now just log
+			log.Error("PDH Collect failed: " + err.Error())
+			status.CPU.LoadAvg = "N/A"
+		}
+	} else {
+		lAvg, err := load.Avg()
+		if err == nil {
+			status.CPU.LoadAvg = fmt.Sprintf("%.2f, %.2f, %.2f", lAvg.Load1, lAvg.Load5, lAvg.Load15)
+		} else {
+			status.CPU.LoadAvg = "N/A"
+		}
 	}
 
 	// 3. Memory
@@ -545,8 +628,8 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	// Note: ghw might require CGO or specific permissions.
 	base, err := ghw.Baseboard()
 	if err == nil {
-		status.Hardware.Motherboard = base.AssetTag
-		status.Hardware.BaseBoard = fmt.Sprintf("%s %s", base.Vendor, base.Product)
+		status.Hardware.Motherboard = base.Product
+		status.Hardware.BaseBoard = base.Vendor
 	}
 	bios, err := ghw.BIOS()
 	if err == nil {
@@ -564,7 +647,11 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	if err == nil {
 		var diskModels []string
 		for _, disk := range block.Disks {
-			diskModels = append(diskModels, fmt.Sprintf("%s (%s)", disk.Model, disk.Vendor))
+			// Clean up model string (remove extra parentheses or weird chars if any)
+			model := strings.TrimSpace(disk.Model)
+			if model != "" {
+				diskModels = append(diskModels, model)
+			}
 		}
 		status.Hardware.DiskModel = strings.Join(diskModels, ", ")
 	}

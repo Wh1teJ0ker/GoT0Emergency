@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/Button';
 import { 
     Activity, Cpu, HardDrive, Network, Zap, Server, 
-    Monitor, Clock, Disc, Layers, List, Box, Info 
+    Monitor, Clock, Disc, Layers, List, Box, Info, RotateCw
 } from 'lucide-react';
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -17,9 +17,10 @@ import { Loading } from '../ui/Loading';
 
 interface FullHostMonitorProps {
     hostId: number;
+    showHistory?: boolean;
 }
 
-export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
+export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorProps) {
     const [status, setStatus] = useState<monitor.HostStatus | null>(null);
     const [metrics, setMetrics] = useState<monitor.MetricPoint[]>([]);
     const [loading, setLoading] = useState(false);
@@ -28,13 +29,17 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
 
     useEffect(() => {
         loadStatus();
-        loadHistory();
+        if (showHistory) {
+            loadHistory();
+        }
         const interval = setInterval(() => {
             loadStatus();
-            loadHistory();
-        }, 60000); // 1 minute interval
+            if (showHistory) {
+                loadHistory();
+            }
+        }, 5000); // 5 seconds interval
         return () => clearInterval(interval);
-    }, [hostId]);
+    }, [hostId, showHistory]);
 
     const loadStatus = async () => {
         // Don't set loading on refresh to avoid flickering
@@ -96,7 +101,8 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
 
     const tabs = [
         { id: 'overview', label: '总览', icon: Activity },
-        { id: 'history', label: '历史趋势', icon: Clock },
+        // Conditionally include history tab
+        ...(showHistory ? [{ id: 'history', label: '历史趋势', icon: Clock }] : []),
         { id: 'cpu', label: 'CPU', icon: Cpu },
         { id: 'memory', label: '内存', icon: Zap },
         { id: 'disk', label: '磁盘', icon: HardDrive },
@@ -124,21 +130,30 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-6 text-sm">
+                <div className="flex gap-6 text-sm items-center">
                     <div className="text-right">
-                        <div className="text-muted-foreground">Uptime</div>
+                        <div className="text-muted-foreground">运行时间</div>
                         <div className="font-medium font-mono">{status.system?.uptime_str || '-'}</div>
                     </div>
                     <div className="text-right">
-                        <div className="text-muted-foreground">Boot Time</div>
+                        <div className="text-muted-foreground">启动时间</div>
                         <div className="font-medium font-mono">
                             {status.system?.boot_time ? new Date(status.system.boot_time * 1000).toLocaleString() : '-'}
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-muted-foreground">User</div>
+                        <div className="text-muted-foreground">当前用户</div>
                         <div className="font-medium">{status.system?.current_user || '-'}</div>
                     </div>
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => { loadStatus(); if (showHistory) loadHistory(); }}
+                        disabled={loading}
+                        title="刷新数据"
+                    >
+                        <RotateCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </Button>
                 </div>
             </div>
 
@@ -168,12 +183,12 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">CPU Usage</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">CPU 使用率</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{status.cpu?.usage_total?.toFixed(1) || 0}%</div>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        {status.cpu?.cores_logical} Cores / {status.cpu?.model}
+                                        {status.cpu?.cores_logical} 核 / {status.cpu?.model}
                                     </p>
                                     <div className="h-1.5 w-full bg-muted mt-3 rounded-full overflow-hidden">
                                         <div 
@@ -185,7 +200,7 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                             </Card>
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Memory Usage</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">内存使用率</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{status.memory?.usage?.toFixed(1) || 0}%</div>
@@ -202,12 +217,12 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                             </Card>
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Disk Usage</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">磁盘使用率</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{status.disk?.usage?.toFixed(1) || 0}%</div>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Used: {formatBytes(status.disk?.used)} / Total: {formatBytes(status.disk?.total)}
+                                        已用: {formatBytes(status.disk?.used)} / 总计: {formatBytes(status.disk?.total)}
                                     </p>
                                     <div className="h-1.5 w-full bg-muted mt-3 rounded-full overflow-hidden">
                                         <div 
@@ -219,14 +234,14 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                             </Card>
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Network I/O</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">网络 I/O</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex justify-between items-baseline">
-                                        <div className="text-sm font-medium">Rx: {formatBytes(status.network?.total_rx)}</div>
+                                        <div className="text-sm font-medium">接收: {formatBytes(status.network?.total_rx)}</div>
                                     </div>
                                     <div className="flex justify-between items-baseline mt-1">
-                                        <div className="text-sm font-medium">Tx: {formatBytes(status.network?.total_tx)}</div>
+                                        <div className="text-sm font-medium">发送: {formatBytes(status.network?.total_tx)}</div>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-2">
                                         {status.network?.tcp_connections} TCP / {status.network?.udp_connections} UDP
@@ -244,18 +259,22 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <CardContent>
                                     <div className="flex items-center gap-8">
                                         <div>
-                                            <div className="text-sm text-muted-foreground mb-1">Load Average (1m, 5m, 15m)</div>
+                                            <div className="text-sm text-muted-foreground mb-1">
+                                                {status.cpu?.load_avg?.includes('Queue Length') 
+                                                    ? '处理器队列长度' 
+                                                    : '平均负载 (1m, 5m, 15m)'}
+                                            </div>
                                             <div className="text-xl font-mono">{status.cpu?.load_avg || 'N/A'}</div>
                                         </div>
                                         <div>
-                                            <div className="text-sm text-muted-foreground mb-1">Process Count</div>
+                                            <div className="text-sm text-muted-foreground mb-1">进程总数</div>
                                             <div className="text-xl font-mono">{status.process?.total || 0}</div>
                                         </div>
                                         <div>
-                                            <div className="text-sm text-muted-foreground mb-1">Service Status</div>
+                                            <div className="text-sm text-muted-foreground mb-1">服务状态</div>
                                             <div className="text-sm font-medium text-green-500 flex items-center gap-1">
                                                 <div className="w-2 h-2 rounded-full bg-green-500" />
-                                                Active
+                                                运行中
                                             </div>
                                         </div>
                                     </div>
@@ -264,12 +283,12 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                         </div>
                     )}
 
-                    {activeTab === 'history' && (
+                    {activeTab === 'history' && showHistory && (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>CPU & Memory History (24h)</CardTitle>
-                                    <CardDescription>Historical resource usage trends.</CardDescription>
+                                    <CardTitle>CPU & 内存 历史记录 (24h)</CardTitle>
+                                    <CardDescription>历史资源使用趋势</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-[400px]">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -283,7 +302,7 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                             />
                                             <Legend />
                                             <Line type="monotone" dataKey="cpu_usage" name="CPU %" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                                            <Line type="monotone" dataKey="memory_usage" name="Memory %" stroke="#eab308" strokeWidth={2} dot={false} />
+                                            <Line type="monotone" dataKey="memory_usage" name="内存 %" stroke="#eab308" strokeWidth={2} dot={false} />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -291,7 +310,7 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                             
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Disk Usage History (24h)</CardTitle>
+                                    <CardTitle>磁盘使用率历史记录 (24h)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="h-[300px]">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -304,7 +323,7 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                                 itemStyle={{ fontSize: '12px' }}
                                             />
                                             <Legend />
-                                            <Line type="monotone" dataKey="disk_usage" name="Disk %" stroke="#22c55e" strokeWidth={2} dot={false} />
+                                            <Line type="monotone" dataKey="disk_usage" name="磁盘 %" stroke="#22c55e" strokeWidth={2} dot={false} />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -320,25 +339,25 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <CardContent className="space-y-4">
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Model</div>
+                                            <div className="text-xs text-muted-foreground">型号</div>
                                             <div className="font-medium text-sm">{status.cpu?.model}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Frequency</div>
+                                            <div className="text-xs text-muted-foreground">频率</div>
                                             <div className="font-medium text-sm">{status.cpu?.frequency?.toFixed(0)} MHz</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Logical Cores</div>
+                                            <div className="text-xs text-muted-foreground">逻辑核心数</div>
                                             <div className="font-medium text-sm">{status.cpu?.cores_logical}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Physical Cores</div>
+                                            <div className="text-xs text-muted-foreground">物理核心数</div>
                                             <div className="font-medium text-sm">{status.cpu?.cores_physical}</div>
                                         </div>
                                     </div>
                                     
                                     <div>
-                                        <h3 className="text-sm font-medium mb-2">Load Average</h3>
+                                        <h3 className="text-sm font-medium mb-2">平均负载</h3>
                                         <div className="p-3 bg-muted/30 rounded-lg font-mono text-sm">
                                             {status.cpu?.load_avg}
                                         </div>
@@ -347,11 +366,11 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                     {/* Per Core Usage */}
                                     {status.cpu?.usage_per_core && status.cpu.usage_per_core.length > 0 && (
                                         <div>
-                                            <h3 className="text-sm font-medium mb-2">Per Core Usage</h3>
+                                            <h3 className="text-sm font-medium mb-2">核心使用率</h3>
                                             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
                                                 {status.cpu.usage_per_core.map((usage, i) => (
                                                     <div key={i} className="bg-muted/30 p-2 rounded text-center">
-                                                        <div className="text-xs text-muted-foreground mb-1">Core {i}</div>
+                                                        <div className="text-xs text-muted-foreground mb-1">核心 {i}</div>
                                                         <div className="h-16 w-4 mx-auto bg-muted rounded-full relative overflow-hidden">
                                                             <div 
                                                                 className="absolute bottom-0 left-0 w-full bg-primary transition-all duration-500"
@@ -377,22 +396,22 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <CardContent className="space-y-6">
                                     {/* Physical Memory */}
                                     <div>
-                                        <h3 className="text-sm font-medium mb-3">Physical Memory</h3>
+                                        <h3 className="text-sm font-medium mb-3">物理内存</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Total</div>
+                                                <div className="text-xs text-muted-foreground">总计</div>
                                                 <div className="font-medium text-sm">{formatBytes(status.memory?.total)}</div>
                                             </div>
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Used</div>
+                                                <div className="text-xs text-muted-foreground">已用</div>
                                                 <div className="font-medium text-sm">{formatBytes(status.memory?.used)}</div>
                                             </div>
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Free</div>
+                                                <div className="text-xs text-muted-foreground">空闲</div>
                                                 <div className="font-medium text-sm">{formatBytes(status.memory?.free)}</div>
                                             </div>
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Usage</div>
+                                                <div className="text-xs text-muted-foreground">使用率</div>
                                                 <div className="font-medium text-sm">{status.memory?.usage?.toFixed(1)}%</div>
                                             </div>
                                         </div>
@@ -409,18 +428,18 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
 
                                     {/* Swap Memory */}
                                     <div>
-                                        <h3 className="text-sm font-medium mb-3">Swap Memory</h3>
+                                        <h3 className="text-sm font-medium mb-3">交换内存</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Total Swap</div>
+                                                <div className="text-xs text-muted-foreground">总计</div>
                                                 <div className="font-medium text-sm">{formatBytes(status.memory?.swap_total)}</div>
                                             </div>
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Used Swap</div>
+                                                <div className="text-xs text-muted-foreground">已用</div>
                                                 <div className="font-medium text-sm">{formatBytes(status.memory?.swap_used)}</div>
                                             </div>
                                             <div className="p-3 bg-muted/30 rounded-lg">
-                                                <div className="text-xs text-muted-foreground">Usage</div>
+                                                <div className="text-xs text-muted-foreground">使用率</div>
                                                 <div className="font-medium text-sm">
                                                     {(status.memory?.swap_total ? (status.memory.swap_used / status.memory.swap_total * 100) : 0).toFixed(1)}%
                                                 </div>
@@ -440,19 +459,19 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <CardContent>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Read Bytes</div>
+                                            <div className="text-xs text-muted-foreground">读取字节数</div>
                                             <div className="font-medium text-sm">{formatBytes(status.disk?.read_bytes)}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Write Bytes</div>
+                                            <div className="text-xs text-muted-foreground">写入字节数</div>
                                             <div className="font-medium text-sm">{formatBytes(status.disk?.write_bytes)}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Read Ops</div>
+                                            <div className="text-xs text-muted-foreground">读取次数</div>
                                             <div className="font-medium text-sm">{status.disk?.read_ops}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Write Ops</div>
+                                            <div className="text-xs text-muted-foreground">写入次数</div>
                                             <div className="font-medium text-sm">{status.disk?.write_ops}</div>
                                         </div>
                                     </div>
@@ -466,11 +485,11 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b">
-                                                    <th className="text-left py-2 font-medium text-muted-foreground">Mount Point</th>
-                                                    <th className="text-left py-2 font-medium text-muted-foreground">FS Type</th>
-                                                    <th className="text-right py-2 font-medium text-muted-foreground">Total</th>
-                                                    <th className="text-right py-2 font-medium text-muted-foreground">Used</th>
-                                                    <th className="text-right py-2 font-medium text-muted-foreground">Usage</th>
+                                                    <th className="text-left py-2 font-medium text-muted-foreground">挂载点</th>
+                                                    <th className="text-left py-2 font-medium text-muted-foreground">文件系统</th>
+                                                    <th className="text-right py-2 font-medium text-muted-foreground">总计</th>
+                                                    <th className="text-right py-2 font-medium text-muted-foreground">已用</th>
+                                                    <th className="text-right py-2 font-medium text-muted-foreground">使用率</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -509,25 +528,25 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <CardContent>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Total Rx</div>
+                                            <div className="text-xs text-muted-foreground">总接收</div>
                                             <div className="font-medium text-sm">{formatBytes(status.network?.total_rx)}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">Total Tx</div>
+                                            <div className="text-xs text-muted-foreground">总发送</div>
                                             <div className="font-medium text-sm">{formatBytes(status.network?.total_tx)}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">TCP Connections</div>
+                                            <div className="text-xs text-muted-foreground">TCP 连接数</div>
                                             <div className="font-medium text-sm">{status.network?.tcp_connections}</div>
                                         </div>
                                         <div className="p-3 bg-muted/30 rounded-lg">
-                                            <div className="text-xs text-muted-foreground">UDP Connections</div>
+                                            <div className="text-xs text-muted-foreground">UDP 连接数</div>
                                             <div className="font-medium text-sm">{status.network?.udp_connections}</div>
                                         </div>
                                     </div>
                                     
                                     <div className="mt-4">
-                                        <h4 className="text-sm font-medium mb-2">Listen Ports</h4>
+                                        <h4 className="text-sm font-medium mb-2">监听端口</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {status.network?.listen_ports?.map((port: number) => (
                                                 <span key={port} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md font-mono">
@@ -535,13 +554,12 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                                 </span>
                                             ))}
                                             {(!status.network?.listen_ports || status.network.listen_ports.length === 0) && (
-                                                <span className="text-muted-foreground text-sm">No ports detected</span>
+                                                <span className="text-muted-foreground text-sm">未检测到端口</span>
                                             )}
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
-
                             <Card>
                                 <CardHeader><CardTitle>网卡接口</CardTitle></CardHeader>
                                 <CardContent>
@@ -549,10 +567,10 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b">
-                                                    <th className="text-left py-2 font-medium text-muted-foreground">Interface</th>
-                                                    <th className="text-left py-2 font-medium text-muted-foreground">IP Address</th>
-                                                    <th className="text-right py-2 font-medium text-muted-foreground">Rx</th>
-                                                    <th className="text-right py-2 font-medium text-muted-foreground">Tx</th>
+                                                    <th className="text-left py-2 font-medium text-muted-foreground">接口名称</th>
+                                                    <th className="text-left py-2 font-medium text-muted-foreground">IP 地址</th>
+                                                    <th className="text-right py-2 font-medium text-muted-foreground">接收</th>
+                                                    <th className="text-right py-2 font-medium text-muted-foreground">发送</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -577,8 +595,8 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                         <Card className="h-full flex flex-col">
                             <CardHeader>
                                 <div className="flex justify-between items-center">
-                                    <CardTitle>Top Processes</CardTitle>
-                                    <span className="text-sm text-muted-foreground">Total: {status.process?.total}</span>
+                                    <CardTitle>Top 进程</CardTitle>
+                                    <span className="text-sm text-muted-foreground">总数: {status.process?.total}</span>
                                 </div>
                             </CardHeader>
                             <CardContent className="flex-1 overflow-auto">
@@ -586,10 +604,10 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                     <thead className="sticky top-0 bg-card z-10">
                                         <tr className="border-b">
                                             <th className="text-left py-2 font-medium text-muted-foreground w-16">PID</th>
-                                            <th className="text-left py-2 font-medium text-muted-foreground">Name</th>
-                                            <th className="text-left py-2 font-medium text-muted-foreground hidden md:table-cell">Path</th>
+                                            <th className="text-left py-2 font-medium text-muted-foreground">名称</th>
+                                            <th className="text-left py-2 font-medium text-muted-foreground hidden md:table-cell">路径</th>
                                             <th className="text-right py-2 font-medium text-muted-foreground">CPU%</th>
-                                            <th className="text-right py-2 font-medium text-muted-foreground">Mem%</th>
+                                            <th className="text-right py-2 font-medium text-muted-foreground">内存%</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -618,7 +636,7 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-4">
                                         <div className="p-4 bg-muted/20 rounded-lg border">
-                                            <div className="text-sm font-medium text-muted-foreground mb-1">Motherboard</div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">主板</div>
                                             <div className="font-medium">{status.hardware?.motherboard || 'Unknown'}</div>
                                             <div className="text-xs text-muted-foreground mt-1">{status.hardware?.baseboard}</div>
                                         </div>
@@ -629,15 +647,15 @@ export function FullHostMonitor({ hostId }: FullHostMonitorProps) {
                                     </div>
                                     <div className="space-y-4">
                                         <div className="p-4 bg-muted/20 rounded-lg border">
-                                            <div className="text-sm font-medium text-muted-foreground mb-1">CPU Model</div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">CPU 型号</div>
                                             <div className="font-medium">{status.cpu?.model || 'Unknown'}</div>
                                         </div>
                                         <div className="p-4 bg-muted/20 rounded-lg border">
-                                            <div className="text-sm font-medium text-muted-foreground mb-1">Memory Model</div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">内存型号</div>
                                             <div className="font-medium">{status.hardware?.memory_model || 'Unknown'}</div>
                                         </div>
                                         <div className="p-4 bg-muted/20 rounded-lg border">
-                                            <div className="text-sm font-medium text-muted-foreground mb-1">Disk Model</div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">硬盘型号</div>
                                             <div className="font-medium">{status.hardware?.disk_model || 'Unknown'}</div>
                                         </div>
                                     </div>

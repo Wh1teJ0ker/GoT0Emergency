@@ -36,7 +36,7 @@ export function LocalPage() {
                 {/* Monitor Tab */}
                 {activeTab === 'monitor' && (
                     <div className="absolute inset-0 overflow-auto">
-                        <FullHostMonitor hostId={0} />
+                        <FullHostMonitor hostId={0} showHistory={false} />
                     </div>
                 )}
 

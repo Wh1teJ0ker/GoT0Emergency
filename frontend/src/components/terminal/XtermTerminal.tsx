@@ -86,8 +86,15 @@ export function XtermTerminal({ hostId, onClose }: XtermTerminalProps) {
 
                 // Handle data from backend
                 EventsOn(`terminal:data:${id}`, (data: string) => {
-                    // Decode base64
-                    const text = atob(data);
+                    // Decode base64 to binary string
+                    const binaryString = atob(data);
+                    // Convert binary string to Uint8Array
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    // Decode UTF-8
+                    const text = new TextDecoder('utf-8').decode(bytes);
                     term.write(text);
                 });
 

@@ -66,7 +66,9 @@ func (a *App) SetRetentionHours(hours int) error {
 
 // Monitor Methods
 func (a *App) CheckHostStatus(hostID int64) (*monitor.HostStatus, error) {
-	return a.monitorService.GetStatus(hostID)
+	// Bypass cache for explicit checks (e.g., from UI refresh)
+	// We want fresh data when the user asks for it.
+	return a.monitorService.CheckHost(hostID)
 }
 
 func (a *App) GetHostMetrics(hostID int64, durationStr string) ([]monitor.MetricPoint, error) {
