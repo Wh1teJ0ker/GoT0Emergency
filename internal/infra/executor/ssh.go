@@ -40,14 +40,21 @@ func (e *SSHExecutor) Exec(cmdStr string) (string, error) {
 }
 
 // Helper to create client (usually handled in session manager, but useful here for simple setup)
-func ConnectSSH(ip string, port int, user string, authMethod ssh.AuthMethod) (*ssh.Client, error) {
+func ConnectSSH(ip string, port int, user string, authMethods []ssh.AuthMethod) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			authMethod,
-		},
+		User:            user,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // MVP: Ignore host key verification
-		Timeout:         5 * time.Second,
+		Timeout:         10 * time.Second,            // Increased timeout for slow networks
+		// Add legacy algorithms for compatibility with older servers
+		HostKeyAlgorithms: []string{
+			ssh.KeyAlgoRSA,
+			ssh.KeyAlgoDSA,
+			ssh.KeyAlgoECDSA256,
+			ssh.KeyAlgoECDSA384,
+			ssh.KeyAlgoECDSA521,
+			ssh.KeyAlgoED25519,
+		},
 	}
 
 	addr := fmt.Sprintf("%s:%d", ip, port)

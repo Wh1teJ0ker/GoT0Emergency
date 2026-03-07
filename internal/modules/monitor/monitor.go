@@ -162,7 +162,7 @@ func NewService(sm *session.SessionManager, le *executor.LocalExecutor, hs *host
 		} else {
 			log.Error("Failed to initialize PDH Queue Length query: " + err.Error())
 		}
-		
+
 		q2, err := pdh.NewProcessorUtilityQuery()
 		if err == nil {
 			s.pdhCPUQuery = q2
@@ -233,21 +233,20 @@ func (s *Service) collectAll() {
 		return
 	}
 
-	for _, h := range hosts {
-		// Only check remote hosts
-		if h.ID == 0 {
-			continue // Skip local if it's in the list? Usually local is treated specially or not in DB.
-			// Assuming GetHosts returns only remote hosts from DB.
+	// 1. Collect Local Host (ID=0)
+	go func() {
+		_, err := s.CheckHost(0)
+		if err != nil {
+			log.Error("Failed to check local host in background: " + err.Error())
 		}
+	}()
 
-		// Run checks concurrently? Maybe limit concurrency.
-		// For now, serial is safer for resource usage, or use a worker pool.
-		// Given "Optimize speed", let's use a semaphore.
+	// 2. Collect Remote Hosts
+	for _, h := range hosts {
+		// Run checks concurrently
 		go func(hid int64) {
 			_, err := s.CheckHost(hid)
 			if err != nil {
-				// Log is handled inside CheckHost for critical errors? No, CheckHost returns error.
-				// We should log it here.
 				log.Error("Failed to check host in background: " + err.Error())
 			}
 		}(h.ID)
@@ -290,10 +289,8 @@ func (s *Service) CheckHost(hostID int64) (*HostStatus, error) {
 	s.mu.Unlock()
 
 	// Save metrics asynchronously
-	// Only save for remote hosts (ID > 0) to avoid FK constraint issues for now
-	if hostID > 0 {
-		go s.saveMetrics(hostID, status)
-	}
+	// Save for all hosts including local (ID=0)
+	go s.saveMetrics(hostID, status)
 
 	return status, nil
 }
@@ -437,7 +434,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	cPercentCore, err := cpu.Percent(500*time.Millisecond, true)
 	if err == nil {
 		status.CPU.UsagePerCore = cPercentCore
-		
+
 		// Calculate total usage as average of per-core usage
 		var totalUsage float64
 		for _, p := range cPercentCore {
@@ -453,7 +450,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 			status.CPU.UsageTotal = cPercent[0]
 		}
 	}
-	
+
 	// If on Windows and PDH is available, override Total Usage with PDH value (Task Manager style)
 	if runtime.GOOS == "windows" && s.pdhCPUQuery != nil {
 		val, err := s.pdhCPUQuery.Collect()

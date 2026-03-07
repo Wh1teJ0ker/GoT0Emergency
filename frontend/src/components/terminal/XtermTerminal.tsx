@@ -32,29 +32,31 @@ export function XtermTerminal({ hostId, onClose }: XtermTerminalProps) {
         const term = new Terminal({
             cursorBlink: true,
             theme: {
-                background: '#0f0f0f',
+                background: '#1e1e1e', // Updated to VS Code style dark
                 foreground: '#cccccc',
                 cursor: '#ffffff',
                 selectionBackground: '#444444',
-                black: '#0f0f0f',
-                red: '#c0392b',
-                green: '#27ae60',
-                yellow: '#f39c12',
-                blue: '#2980b9',
-                magenta: '#8e44ad',
-                cyan: '#16a085',
-                white: '#ffffff',
-                brightBlack: '#7f8c8d',
-                brightRed: '#e74c3c',
-                brightGreen: '#2ecc71',
-                brightYellow: '#f1c40f',
-                brightBlue: '#3498db',
-                brightMagenta: '#9b59b6',
-                brightCyan: '#1abc9c',
-                brightWhite: '#ecf0f1',
+                black: '#000000',
+                red: '#cd3131',
+                green: '#0dbc79',
+                yellow: '#e5e510',
+                blue: '#2472c8',
+                magenta: '#bc3fbc',
+                cyan: '#11a8cd',
+                white: '#e5e5e5',
+                brightBlack: '#666666',
+                brightRed: '#f14c4c',
+                brightGreen: '#23d18b',
+                brightYellow: '#f5f543',
+                brightBlue: '#3b8eea',
+                brightMagenta: '#d670d6',
+                brightCyan: '#29b8db',
+                brightWhite: '#e5e5e5',
             },
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             fontSize: 14,
+            fontWeight: 'bold', // Forced bold
+            fontWeightBold: '900', // Extra bold
             lineHeight: 1.2,
             letterSpacing: 0,
             scrollback: 5000, // Limit scrollback for memory optimization
@@ -166,5 +168,24 @@ export function XtermTerminal({ hostId, onClose }: XtermTerminalProps) {
         };
     }, [hostId]);
 
-    return <div className="w-full h-full" ref={terminalRef} />;
+    return (
+        <div className="w-full h-full relative bg-[#1e1e1e]" ref={terminalRef}>
+            <style>{`
+                .xterm-viewport::-webkit-scrollbar {
+                    width: 12px;
+                }
+                .xterm-viewport::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.05);
+                }
+                .xterm-viewport::-webkit-scrollbar-thumb {
+                    background-color: #888;
+                    border-radius: 6px;
+                    border: 2px solid #1e1e1e;
+                }
+                .xterm-viewport::-webkit-scrollbar-thumb:hover {
+                    background-color: #bbb;
+                }
+            `}</style>
+        </div>
+    );
 }

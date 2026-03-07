@@ -131,10 +131,13 @@ export function LogsPage() {
     };
 
     return (
-        <PageContainer className="space-y-4">
-            <div className="flex flex-col gap-4">
+        <PageContainer className="h-full flex flex-col space-y-4 overflow-hidden">
+            <div className="flex flex-col gap-4 shrink-0">
                 <div className="flex justify-between items-center">
-                    <PageHeader title="日志管理" description="查看和管理系统日志" />
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight">日志管理</h1>
+                        <p className="text-muted-foreground text-sm">查看和管理系统运行日志。</p>
+                    </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => loadLogs(selectedDate)} disabled={loading || !selectedDate}>
                             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -194,51 +197,66 @@ export function LogsPage() {
             </div>
 
             {/* Log List */}
-            <Card className="flex-1 overflow-hidden flex flex-col min-h-[500px]">
-                <CardContent className="flex-1 p-0 overflow-hidden relative">
-                    <div className="absolute inset-0 overflow-auto p-0">
-                        <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-muted/50 text-xs uppercase sticky top-0 z-10 backdrop-blur-sm">
+            <Card className="flex-1 overflow-hidden border shadow-sm">
+                <div className="h-full overflow-auto">
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead className="bg-muted/80 text-xs uppercase sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                            <tr>
+                                <th className="px-4 py-3 font-semibold text-muted-foreground w-[180px]">时间</th>
+                                <th className="px-4 py-3 font-semibold text-muted-foreground w-[80px]">级别</th>
+                                <th className="px-4 py-3 font-semibold text-muted-foreground max-w-[600px]">消息内容</th>
+                                <th className="px-4 py-3 font-semibold text-muted-foreground w-[300px]">其他信息</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {filteredLogs.length === 0 ? (
                                 <tr>
-                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[180px]">时间</th>
-                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[80px]">级别</th>
-                                    <th className="px-4 py-2 font-medium text-muted-foreground">消息</th>
-                                    <th className="px-4 py-2 font-medium text-muted-foreground w-[200px]">详情</th>
+                                    <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Search className="h-8 w-8 opacity-20" />
+                                            <span>没有找到匹配的日志记录</span>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {filteredLogs.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                                            没有找到匹配的日志。
+                            ) : (
+                                filteredLogs.map((log, index) => (
+                                    <tr key={index} className="hover:bg-muted/30 transition-colors group border-b border-border/40 last:border-0">
+                                        <td className="px-4 py-2 whitespace-nowrap text-muted-foreground font-mono text-xs w-[180px]">
+                                            {log.time ? new Date(log.time).toLocaleString() : '-'}
                                         </td>
-                                    </tr>
-                                ) : (
-                                    filteredLogs.map((log, index) => (
-                                        <tr key={index} className="hover:bg-muted/30 transition-colors group">
-                                            <td className="px-4 py-2 whitespace-nowrap text-muted-foreground font-mono text-xs">
-                                                {log.time ? new Date(log.time).toLocaleString() : '-'}
-                                            </td>
-                                            <td className={`px-4 py-2 font-bold text-xs ${getLevelColor(log.level)}`}>
+                                        <td className="px-4 py-2 w-[80px]">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                log.level === 'INFO' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                                log.level === 'WARN' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                                log.level === 'ERROR' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                                'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                            }`}>
                                                 {log.level || 'UNKNOWN'}
-                                            </td>
-                                            <td className="px-4 py-2 break-all font-mono text-xs">
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2 font-mono text-xs text-foreground/90 leading-relaxed max-w-[600px]">
+                                            <div className="line-clamp-2" title={log.msg}>
                                                 {log.msg}
-                                            </td>
-                                            <td className="px-4 py-2 text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                                                {/* Render extra fields as badges or text */}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-xs text-muted-foreground font-mono w-[300px]">
+                                            <div className="flex flex-wrap gap-1">
                                                 {Object.entries(log)
                                                     .filter(([k]) => !['time', 'level', 'msg'].includes(k))
-                                                    .map(([k, v]) => `${k}=${v}`)
-                                                    .join(' ')}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </CardContent>
+                                                    .map(([k, v]) => (
+                                                        <span key={k} className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/50 text-[10px] border border-border/50 whitespace-nowrap" title={String(v)}>
+                                                            <span className="opacity-70 mr-1">{k}:</span>
+                                                            <span className="max-w-full break-all">{String(v)}</span>
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </Card>
         </PageContainer>
     );

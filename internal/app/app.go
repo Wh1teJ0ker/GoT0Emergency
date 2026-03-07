@@ -351,6 +351,10 @@ func (a *App) DownloadFile(hostID int64, remotePath, localPath string, resume bo
 	return a.sessionManager.DownloadFile(hostID, remotePath, localPath, resume)
 }
 
+func (a *App) RemoveRemoteFile(hostID int64, remotePath string) error {
+	return a.sessionManager.RemoveFile(hostID, remotePath)
+}
+
 func (a *App) ListRemoteFiles(hostID int64, remotePath string) ([]session.FileInfo, error) {
 	return a.sessionManager.ListFiles(hostID, remotePath)
 }

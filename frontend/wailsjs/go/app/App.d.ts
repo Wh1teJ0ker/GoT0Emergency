@@ -59,6 +59,8 @@ export function ListRemoteFiles(arg1:number,arg2:string):Promise<Array<session.F
 
 export function RDPOpen(arg1:number):Promise<void>;
 
+export function RemoveRemoteFile(arg1:number,arg2:string):Promise<void>;
+
 export function RunNode(arg1:number):Promise<string>;
 
 export function SavePluginSource(arg1:string,arg2:string):Promise<void>;

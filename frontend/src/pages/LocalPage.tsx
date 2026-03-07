@@ -41,8 +41,25 @@ export function LocalPage() {
                 )}
 
                 {/* Terminal Tab */}
-                <div className={`absolute inset-0 p-1 ${activeTab === 'terminal' ? 'block' : 'hidden'}`}>
-                    <XtermTerminal hostId={0} />
+                <div className={`absolute inset-0 p-6 ${activeTab === 'terminal' ? 'block' : 'hidden'}`}>
+                    <div className="w-full h-full flex flex-col rounded-lg border border-zinc-800 bg-[#1e1e1e] shadow-xl overflow-hidden">
+                        {/* Terminal Header */}
+                        <div className="h-9 bg-[#1e1e1e] border-b border-zinc-800 flex items-center px-4 justify-between select-none">
+                            <div className="flex items-center gap-2">
+                                <Terminal size={14} className="text-zinc-400" />
+                                <span className="text-xs text-zinc-400 font-mono">Local Terminal</span>
+                            </div>
+                            <div className="flex gap-1.5 opacity-50 hover:opacity-100 transition-opacity">
+                                <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                            </div>
+                        </div>
+                        {/* Terminal Body with Padding */}
+                        <div className="flex-1 p-3 relative">
+                            <XtermTerminal hostId={0} />
+                        </div>
+                    </div>
                 </div>
             </div>
         </PageContainer>

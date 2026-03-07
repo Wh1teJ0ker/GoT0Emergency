@@ -37,12 +37,11 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
             if (showHistory) {
                 loadHistory();
             }
-        }, 5000); // 5 seconds interval
+        }, 60000); 
         return () => clearInterval(interval);
     }, [hostId, showHistory]);
 
     const loadStatus = async () => {
-        // Don't set loading on refresh to avoid flickering
         if (!status) setLoading(true);
         try {
             const result = await CheckHostStatus(hostId);
@@ -57,7 +56,6 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
     };
 
     const loadHistory = async () => {
-        if (hostId === 0) return; // Skip history for local host for now if not persisted
         try {
             const data = await GetHostMetrics(hostId, "24h");
             if (data) {
@@ -101,7 +99,6 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
 
     const tabs = [
         { id: 'overview', label: '总览', icon: Activity },
-        // Conditionally include history tab
         ...(showHistory ? [{ id: 'history', label: '历史趋势', icon: Clock }] : []),
         { id: 'cpu', label: 'CPU', icon: Cpu },
         { id: 'memory', label: '内存', icon: Zap },

@@ -6,17 +6,16 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 // @ts-ignore
-import { GetHosts, CreateHost, DeleteHost, DeployNode, SelectFile } from '../../wailsjs/go/app/App';
+import { GetHosts, CreateHost, DeleteHost, DeployNode, SelectFile, ConnectSSH, IsConnected } from '../../wailsjs/go/app/App';
 // @ts-ignore
 import { host } from '../../wailsjs/go/models';
 import { 
     Trash2, Plus, Server, Key, Zap, MonitorSmartphone, 
-    Monitor, Settings, ChevronDown, ChevronRight, CheckCircle, Terminal
+    Monitor, Settings, ChevronDown, ChevronRight, CheckCircle, Terminal, Power, PowerOff
 } from 'lucide-react';
 import { SessionView } from '../components/remote/SessionView';
 import { Loading } from '../components/ui/Loading';
 
-// Simple Modal Component to replace Radix Dialog
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
     if (!open) return null;
     return createPortal(
@@ -39,6 +38,8 @@ export function RemotePage() {
     const navigate = useNavigate();
     const [hosts, setHosts] = useState<host.Host[]>([]);
     const [loading, setLoading] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<Record<number, boolean>>({});
+    const [connectingHosts, setConnectingHosts] = useState<number[]>([]); // Track connecting state
     
     // Main Page State
     const [activeTab, setActiveTab] = useState<'hosts' | 'batch'>('hosts');
@@ -64,10 +65,43 @@ export function RemotePage() {
         try {
             const result = await GetHosts();
             setHosts(result || []);
+            // Check connections after loading hosts
+            if (result && result.length > 0) {
+                checkConnections(result);
+            }
         } catch (err) {
             console.error("Failed to load hosts:", err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const checkConnections = async (hostList: host.Host[]) => {
+        const statuses: Record<number, boolean> = {};
+        for (const h of hostList) {
+            try {
+                const connected = await IsConnected(h.id);
+                statuses[h.id] = connected;
+            } catch (e) {
+                statuses[h.id] = false;
+            }
+        }
+        setConnectionStatus(prev => ({ ...prev, ...statuses }));
+    };
+
+    const handleConnect = async (hostId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        
+        setConnectingHosts(prev => [...prev, hostId]);
+        try {
+            await ConnectSSH(hostId);
+            setConnectionStatus(prev => ({ ...prev, [hostId]: true }));
+        } catch (err) {
+            console.error("Connection failed:", err);
+            alert("连接失败: " + err);
+            setConnectionStatus(prev => ({ ...prev, [hostId]: false }));
+        } finally {
+            setConnectingHosts(prev => prev.filter(id => id !== hostId));
         }
     };
 
@@ -198,9 +232,6 @@ export function RemotePage() {
                             <Button size="sm" onClick={() => startCreate('linux')} className="gap-2">
                                 <Plus size={16} /> Linux 主机
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => startCreate('windows')} className="gap-2">
-                                <Plus size={16} /> Windows 主机
-                            </Button>
                         </div>
 
                         {loading && hosts.length === 0 ? <Loading /> : (
@@ -226,9 +257,23 @@ export function RemotePage() {
                                                         <div>
                                                             <div className="font-medium flex items-center gap-2">
                                                                 {h.name}
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                                    <CheckCircle size={10} className="mr-1" /> 在线
-                                                                </span>
+                                                                {connectingHosts.includes(h.id) ? (
+                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 animate-pulse">
+                                                                        <Zap size={10} className="mr-1" /> 连接中...
+                                                                    </span>
+                                                                ) : connectionStatus[h.id] ? (
+                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                                        <CheckCircle size={10} className="mr-1" /> 在线
+                                                                    </span>
+                                                                ) : (
+                                                                    <button 
+                                                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                                                                        onClick={(e) => handleConnect(h.id, e)}
+                                                                        title="点击连接"
+                                                                    >
+                                                                        <PowerOff size={10} className="mr-1" /> 离线 (点击连接)
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                             <div className="text-sm text-muted-foreground flex items-center gap-4 mt-1">
                                                                 <span className="flex items-center gap-1"><Monitor size={12} /> {h.ip}:{h.port}</span>
@@ -301,7 +346,13 @@ export function RemotePage() {
                                             <td className="p-3 font-medium">{h.name}</td>
                                             <td className="p-3 text-muted-foreground">{h.ip}</td>
                                             <td className="p-3">{h.port === 3389 ? 'Windows' : 'Linux/Unix'}</td>
-                                            <td className="p-3"><span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">在线</span></td>
+                                            <td className="p-3">
+                                                {connectionStatus[h.id] ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">在线</span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">离线</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                     {hosts.length === 0 && (
@@ -320,7 +371,7 @@ export function RemotePage() {
             <Modal 
                 open={isCreating} 
                 onClose={() => setIsCreating(false)} 
-                title={newHost.port === 3389 ? "添加 Windows 主机" : "添加 Linux 主机"}
+                title="添加主机"
             >
                 <div className="space-y-4">
                     <div className="space-y-1">

@@ -68,25 +68,25 @@ export function PluginManager() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {plugins.map(p => (
-                    <Card key={p.name} className="hover:shadow-md transition-shadow">
+                    <Card key={p.name} className="hover:shadow-lg hover:border-primary/50 transition-all duration-200 group">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
-                                <Box size={20} className="text-primary" />
+                            <CardTitle className="flex items-center gap-2 text-lg group-hover:text-primary transition-colors">
+                                <Box size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
                                 {p.name}
                             </CardTitle>
-                            <CardDescription className="font-mono text-xs bg-muted px-2 py-1 rounded w-fit mt-1">
-                                {p.tag}
+                            <CardDescription className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded w-fit mt-1 uppercase tracking-wider">
+                                {p.tag || 'LATEST'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                                {p.description}
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-4 min-h-[40px] line-clamp-2">
+                                {p.description || "暂无描述"}
                             </p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded border font-mono break-all mb-4">
-                                <Code size={12} />
-                                {p.path}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-dashed font-mono break-all mb-4 group-hover:bg-muted/50 transition-colors">
+                                <Code size={12} className="shrink-0" />
+                                <span className="truncate">{p.path}</span>
                             </div>
-                            <Button variant="outline" size="sm" className="w-full" onClick={() => setEditingPlugin(p.name)}>
+                            <Button variant="outline" size="sm" className="w-full group-hover:border-primary/50 group-hover:text-primary transition-colors" onClick={() => setEditingPlugin(p.name)}>
                                 <Edit size={14} className="mr-2" />
                                 编辑源码
                             </Button>
@@ -103,37 +103,41 @@ export function PluginManager() {
 
             {/* Create Dialog */}
             {showCreate && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <Card className="w-[400px] bg-background shadow-xl border border-border">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <Card className="w-[420px] bg-background shadow-2xl border border-border scale-100 animate-in zoom-in-95 duration-200">
                         <CardHeader>
-                            <CardTitle>新建插件</CardTitle>
-                            <CardDescription>创建一个新的 Node 功能模块。</CardDescription>
+                            <CardTitle className="text-xl">新建插件</CardTitle>
+                            <CardDescription>创建一个新的 Node 功能模块 (Go语言)。</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-5">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">插件名称 (英文)</label>
+                                <label className="text-sm font-medium text-foreground/80">插件名称 (英文)</label>
                                 <input 
-                                    className="w-full p-2 rounded-md border bg-background"
+                                    className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
                                     placeholder="例如: redis_monitor"
                                     value={newPluginName}
                                     onChange={(e) => setNewPluginName(e.target.value)}
+                                    autoFocus
                                 />
+                                <p className="text-[10px] text-muted-foreground">只能包含小写字母、数字和下划线。</p>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">描述</label>
+                                <label className="text-sm font-medium text-foreground/80">功能描述</label>
                                 <textarea 
-                                    className="w-full p-2 rounded-md border bg-background min-h-[80px]"
-                                    placeholder="描述该插件的功能..."
+                                    className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[100px] resize-none transition-all"
+                                    placeholder="简要描述该插件的功能..."
                                     value={newPluginDesc}
                                     onChange={(e) => setNewPluginDesc(e.target.value)}
                                 />
                             </div>
                             {createError && (
-                                <p className="text-xs text-red-500">{createError}</p>
+                                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-center gap-2">
+                                    <span>⚠️</span> {createError}
+                                </div>
                             )}
-                            <div className="flex justify-end gap-2 mt-4">
-                                <Button variant="ghost" onClick={() => setShowCreate(false)}>取消</Button>
-                                <Button onClick={handleCreate}>创建</Button>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <Button variant="ghost" onClick={() => setShowCreate(false)} className="hover:bg-muted">取消</Button>
+                                <Button onClick={handleCreate} className="px-6">创建插件</Button>
                             </div>
                         </CardContent>
                     </Card>

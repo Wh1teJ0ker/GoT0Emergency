@@ -11,9 +11,10 @@ import (
 	"GoT0Emergency/internal/modules/host"
 	"GoT0Emergency/internal/pkg/log"
 
+	"net"
+
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
-	"net"
 )
 
 type SessionManager struct {
@@ -51,9 +52,17 @@ func (sm *SessionManager) Connect(hostID int64) error {
 
 	log.Info("Connecting to host via SSH", "host", h.Name, "ip", h.IP, "port", h.Port)
 
-	var authMethod ssh.AuthMethod
+	var authMethods []ssh.AuthMethod
 	if h.AuthType == "password" {
-		authMethod = ssh.Password(h.Password)
+		authMethods = append(authMethods, ssh.Password(h.Password))
+		// Also try Keyboard Interactive as fallback
+		authMethods = append(authMethods, ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) (answers []string, err error) {
+			answers = make([]string, len(questions))
+			for i := range questions {
+				answers[i] = h.Password
+			}
+			return answers, nil
+		}))
 	} else if h.AuthType == "key" {
 		key, err := os.ReadFile(h.KeyPath)
 		if err != nil {
@@ -63,19 +72,17 @@ func (sm *SessionManager) Connect(hostID int64) error {
 		if err != nil {
 			return fmt.Errorf("unable to parse private key: %v", err)
 		}
-		authMethod = ssh.PublicKeys(signer)
+		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	} else {
-		// Default to password if not specified
-		authMethod = ssh.Password(h.Password)
+		authMethods = append(authMethods, ssh.Password(h.Password))
 	}
 
-	// Heuristic: If port is 3389 (RDP), assume SSH is on standard port 22
 	sshPort := h.Port
 	if sshPort == 3389 {
 		sshPort = 22
 	}
 
-	client, err := executor.ConnectSSH(h.IP, sshPort, h.Username, authMethod)
+	client, err := executor.ConnectSSH(h.IP, sshPort, h.Username, authMethods)
 	if err != nil {
 		log.Error("Failed to connect to host", "host", h.Name, "err", err)
 		return err
@@ -148,7 +155,7 @@ func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	
+
 	client, ok = sm.connections[hostID]
 	if !ok {
 		return nil, fmt.Errorf("failed to retrieve connection after connect for host %d", hostID)
@@ -182,7 +189,7 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 	}
 
 	go func() {
-		// Close listener when session closes? 
+		// Close listener when session closes?
 		// Ideally we track this listener to close it, but for now rely on client close.
 		// But client.Listen returns a listener that needs to be accepted.
 		for {
@@ -197,16 +204,16 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 				continue
 			}
 
-			go func() {
-				defer remoteConn.Close()
-				defer localConn.Close()
-				io.Copy(remoteConn, localConn)
-			}()
-			go func() {
-				defer remoteConn.Close()
-				defer localConn.Close()
-				io.Copy(localConn, remoteConn)
-			}()
+			go func(rc, lc net.Conn) {
+				defer rc.Close()
+				defer lc.Close()
+				io.Copy(rc, lc)
+			}(remoteConn, localConn)
+			go func(rc, lc net.Conn) {
+				defer rc.Close()
+				defer lc.Close()
+				io.Copy(lc, rc)
+			}(remoteConn, localConn)
 		}
 	}()
 
@@ -276,6 +283,23 @@ func (sm *SessionManager) UploadFile(hostID int64, localPath, remotePath string,
 		}
 	}
 
+	return nil
+}
+
+func (sm *SessionManager) RemoveFile(hostID int64, remotePath string) error {
+	executor, err := sm.GetExecutor(hostID)
+	if err != nil {
+		return err
+	}
+
+	// Use rm -rf to force delete files or directories
+	// Be careful with quoting to avoid command injection if possible, though path is usually safe-ish here
+	// Better to wrap path in quotes
+	cmd := fmt.Sprintf("rm -rf \"%s\"", remotePath)
+	_, err = executor.Exec(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove file/dir: %w", err)
+	}
 	return nil
 }
 
