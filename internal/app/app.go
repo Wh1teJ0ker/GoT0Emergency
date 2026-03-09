@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os/exec"
@@ -128,7 +127,7 @@ func (a *App) startCallbackServer(port int) {
 	})
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    log.Sprintf(":%d", port),
 		Handler: mux,
 	}
 
@@ -166,7 +165,7 @@ func (a *App) ClearLogs() error {
 
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+	return log.Sprintf("Hello %s, It's show time!", name)
 }
 
 // Host Methods
@@ -211,7 +210,7 @@ func (a *App) LaunchRDP(hostID int64, width, height int) error {
 		}
 	}
 	if !found {
-		return fmt.Errorf("host not found")
+		return log.Errorf("host not found")
 	}
 
 	config := rdp.RDPConfig{
@@ -274,7 +273,7 @@ func (a *App) DeployNode(hostID int64, targetOS, targetArch string) (string, err
 
 	err = a.sessionManager.UploadFile(hostID, nodePath, remotePath, false)
 	if err != nil {
-		return "", fmt.Errorf("upload failed: %w", err)
+		return "", log.Errorf("upload failed: %w", err)
 	}
 
 	// 3. Execute Node (in background)
@@ -285,10 +284,10 @@ func (a *App) DeployNode(hostID int64, targetOS, targetArch string) (string, err
 		_ = a.sessionManager.ForwardRemotePort(hostID, 36911, 36911)
 	}
 
-	cmdStr := fmt.Sprintf("nohup %s -callback http://localhost:36911/api/callback > /dev/null 2>&1 &", remotePath)
+	cmdStr := log.Sprintf("nohup %s -callback http://localhost:36911/api/callback > /dev/null 2>&1 &", remotePath)
 	if targetOS == "windows" {
 		// PowerShell Start-Process
-		cmdStr = fmt.Sprintf("powershell -Command \"Start-Process -FilePath '%s' -ArgumentList '-callback http://localhost:36911/api/callback' -WindowStyle Hidden\"", remotePath)
+		cmdStr = log.Sprintf("powershell -Command \"Start-Process -FilePath '%s' -ArgumentList '-callback http://localhost:36911/api/callback' -WindowStyle Hidden\"", remotePath)
 	}
 
 	executor, err := a.sessionManager.GetExecutor(hostID)
@@ -323,20 +322,20 @@ func (a *App) RunNode(hostID int64) (string, error) {
 	}
 
 	// Check if file exists (simple check via ls)
-	_, err = executor.Exec(fmt.Sprintf("ls %s", remotePath))
+	_, err = executor.Exec(log.Sprintf("ls %s", remotePath))
 	if err != nil {
 		// Try Windows path
 		remotePath = "C:\\Windows\\Temp\\got0_node.exe"
-		_, err = executor.Exec(fmt.Sprintf("dir %s", remotePath))
+		_, err = executor.Exec(log.Sprintf("dir %s", remotePath))
 		if err != nil {
-			return "", fmt.Errorf("node binary not found on remote host (checked /tmp/got0_node and C:\\Windows\\Temp\\got0_node.exe)")
+			return "", log.Errorf("node binary not found on remote host (checked /tmp/got0_node and C:\\Windows\\Temp\\got0_node.exe)")
 		}
 	}
 
 	// 2. Execute Node Synchronously
 	output, err := executor.Exec(remotePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to run node: %w", err)
+		return "", log.Errorf("failed to run node: %w", err)
 	}
 
 	return output, nil
@@ -373,17 +372,17 @@ func (a *App) RDPOpen(hostID int64) error {
 		}
 	}
 	if targetHost == nil {
-		return fmt.Errorf("host not found")
+		return log.Errorf("host not found")
 	}
 
 	// Launch RDP client
 	if stdRuntime.GOOS == "darwin" {
-		return exec.Command("open", fmt.Sprintf("rdp://%s", targetHost.IP)).Start()
+		return exec.Command("open", log.Sprintf("rdp://%s", targetHost.IP)).Start()
 	} else if stdRuntime.GOOS == "windows" {
 		return exec.Command("mstsc", "/v:"+targetHost.IP).Start()
 	} else {
 		// Linux: remmina? xfreerdp?
-		return fmt.Errorf("RDP launch not supported on this OS: %s", stdRuntime.GOOS)
+		return log.Errorf("RDP launch not supported on this OS: %s", stdRuntime.GOOS)
 	}
 }
 
@@ -446,7 +445,7 @@ func (a *App) TerminalOpen(hostID int64, rows, cols int) (string, error) {
 func (a *App) TerminalWrite(id string, data string) error {
 	t, ok := a.terminalManager.Get(id)
 	if !ok {
-		return fmt.Errorf("terminal not found")
+		return log.Errorf("terminal not found")
 	}
 	_, err := t.Write([]byte(data))
 	return err
@@ -455,7 +454,7 @@ func (a *App) TerminalWrite(id string, data string) error {
 func (a *App) TerminalResize(id string, rows, cols int) error {
 	t, ok := a.terminalManager.Get(id)
 	if !ok {
-		return fmt.Errorf("terminal not found")
+		return log.Errorf("terminal not found")
 	}
 	return t.Resize(rows, cols)
 }

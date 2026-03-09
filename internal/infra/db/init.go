@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	_ "embed"
-	"fmt"
 	"time"
 
 	"GoT0Emergency/internal/pkg/log"
@@ -27,7 +26,7 @@ func Init() error {
 	var err error
 	DB, err = sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return log.Errorf("failed to open database: %w", err)
 	}
 
 	DB.SetMaxOpenConns(1) // SQLite works best with 1 writer, but WAL allows multiple readers.
@@ -38,7 +37,7 @@ func Init() error {
 	DB.SetConnMaxLifetime(5 * time.Minute)
 
 	if err = DB.Ping(); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+		return log.Errorf("failed to ping database: %w", err)
 	}
 
 	return migrate()
@@ -47,7 +46,7 @@ func Init() error {
 func migrate() error {
 	_, err := DB.Exec(schema)
 	if err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
+		return log.Errorf("failed to execute schema: %w", err)
 	}
 	return nil
 }

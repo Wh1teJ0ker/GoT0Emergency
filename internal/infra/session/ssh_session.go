@@ -1,7 +1,6 @@
 package session
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -66,11 +65,11 @@ func (sm *SessionManager) Connect(hostID int64) error {
 	} else if h.AuthType == "key" {
 		key, err := os.ReadFile(h.KeyPath)
 		if err != nil {
-			return fmt.Errorf("unable to read private key: %v", err)
+			return log.Errorf("unable to read private key: %v", err)
 		}
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
-			return fmt.Errorf("unable to parse private key: %v", err)
+			return log.Errorf("unable to parse private key: %v", err)
 		}
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	} else {
@@ -102,7 +101,7 @@ func (sm *SessionManager) ListFiles(hostID int64, remotePath string) ([]FileInfo
 
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sftp client: %w", err)
+		return nil, log.Errorf("failed to create sftp client: %w", err)
 	}
 	defer sftpClient.Close()
 
@@ -158,7 +157,7 @@ func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 
 	client, ok = sm.connections[hostID]
 	if !ok {
-		return nil, fmt.Errorf("failed to retrieve connection after connect for host %d", hostID)
+		return nil, log.Errorf("failed to retrieve connection after connect for host %d", hostID)
 	}
 	return client, nil
 }
@@ -183,9 +182,9 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 	// Listen on remote port
 	// "tcp" implies listening on all interfaces on remote, or "localhost" for local only?
 	// Usually "0.0.0.0" or "localhost". "localhost" is safer.
-	listener, err := client.Listen("tcp", fmt.Sprintf("localhost:%d", remotePort))
+	listener, err := client.Listen("tcp", log.Sprintf("localhost:%d", remotePort))
 	if err != nil {
-		return fmt.Errorf("failed to listen on remote port %d: %w", remotePort, err)
+		return log.Errorf("failed to listen on remote port %d: %w", remotePort, err)
 	}
 
 	go func() {
@@ -198,7 +197,7 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 				return // Listener closed
 			}
 
-			localConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", localPort))
+			localConn, err := net.Dial("tcp", log.Sprintf("localhost:%d", localPort))
 			if err != nil {
 				remoteConn.Close()
 				continue
@@ -235,13 +234,13 @@ func (sm *SessionManager) UploadFile(hostID int64, localPath, remotePath string,
 
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		return fmt.Errorf("failed to create sftp client: %w", err)
+		return log.Errorf("failed to create sftp client: %w", err)
 	}
 	defer sftpClient.Close()
 
 	srcFile, err := os.Open(localPath)
 	if err != nil {
-		return fmt.Errorf("failed to open local file: %w", err)
+		return log.Errorf("failed to open local file: %w", err)
 	}
 	defer srcFile.Close()
 
@@ -262,24 +261,24 @@ func (sm *SessionManager) UploadFile(hostID int64, localPath, remotePath string,
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to open/create remote file: %w", err)
+		return log.Errorf("failed to open/create remote file: %w", err)
 	}
 	defer dstFile.Close()
 
 	if offset > 0 {
 		if _, err := srcFile.Seek(offset, 0); err != nil {
-			return fmt.Errorf("failed to seek local file: %w", err)
+			return log.Errorf("failed to seek local file: %w", err)
 		}
 	}
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return log.Errorf("failed to copy file: %w", err)
 	}
 
 	// Only chmod if it's a new file or we want to ensure permissions
 	if !resume || offset == 0 {
 		if err := sftpClient.Chmod(remotePath, 0755); err != nil {
-			return fmt.Errorf("failed to chmod remote file: %w", err)
+			return log.Errorf("failed to chmod remote file: %w", err)
 		}
 	}
 
@@ -295,10 +294,10 @@ func (sm *SessionManager) RemoveFile(hostID int64, remotePath string) error {
 	// Use rm -rf to force delete files or directories
 	// Be careful with quoting to avoid command injection if possible, though path is usually safe-ish here
 	// Better to wrap path in quotes
-	cmd := fmt.Sprintf("rm -rf \"%s\"", remotePath)
+	cmd := log.Sprintf("rm -rf \"%s\"", remotePath)
 	_, err = executor.Exec(cmd)
 	if err != nil {
-		return fmt.Errorf("failed to remove file/dir: %w", err)
+		return log.Errorf("failed to remove file/dir: %w", err)
 	}
 	return nil
 }
@@ -311,13 +310,13 @@ func (sm *SessionManager) DownloadFile(hostID int64, remotePath, localPath strin
 
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		return fmt.Errorf("failed to create sftp client: %w", err)
+		return log.Errorf("failed to create sftp client: %w", err)
 	}
 	defer sftpClient.Close()
 
 	srcFile, err := sftpClient.Open(remotePath)
 	if err != nil {
-		return fmt.Errorf("failed to open remote file: %w", err)
+		return log.Errorf("failed to open remote file: %w", err)
 	}
 	defer srcFile.Close()
 
@@ -337,18 +336,18 @@ func (sm *SessionManager) DownloadFile(hostID int64, remotePath, localPath strin
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to create/open local file: %w", err)
+		return log.Errorf("failed to create/open local file: %w", err)
 	}
 	defer dstFile.Close()
 
 	if offset > 0 {
 		if _, err := srcFile.Seek(offset, 0); err != nil {
-			return fmt.Errorf("failed to seek remote file: %w", err)
+			return log.Errorf("failed to seek remote file: %w", err)
 		}
 	}
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return log.Errorf("failed to copy file: %w", err)
 	}
 
 	return nil

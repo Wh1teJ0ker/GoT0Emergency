@@ -4,7 +4,7 @@
 package pdh
 
 import (
-	"fmt"
+	"GoT0Emergency/internal/pkg/log"
 	"syscall"
 	"unsafe"
 )
@@ -29,12 +29,12 @@ func NewPDHQuery(counterPath string) (*PDHQuery, error) {
 	// 0, 0, &query
 	r, _, err := procPdhOpenQuery.Call(0, 0, uintptr(unsafe.Pointer(&query)))
 	if r != 0 {
-		return nil, fmt.Errorf("PdhOpenQueryW failed: %v", err)
+		return nil, log.Errorf("PdhOpenQueryW failed: %v", err)
 	}
 
 	var counter syscall.Handle
 	path, _ := syscall.UTF16PtrFromString(counterPath)
-	
+
 	// query, path, userData, &counter
 	r, _, err = procPdhAddEnglishCounter.Call(
 		uintptr(query),
@@ -43,7 +43,7 @@ func NewPDHQuery(counterPath string) (*PDHQuery, error) {
 		uintptr(unsafe.Pointer(&counter)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("PdhAddEnglishCounterW failed for %s: %v", counterPath, err)
+		return nil, log.Errorf("PdhAddEnglishCounterW failed for %s: %v", counterPath, err)
 	}
 
 	// Initial collection
@@ -65,7 +65,7 @@ func NewProcessorUtilityQuery() (*PDHQuery, error) {
 	if err == nil {
 		return q, nil
 	}
-	
+
 	// Fallback to traditional Processor Time
 	return NewPDHQuery("\\Processor(_Total)\\% Processor Time")
 }
@@ -73,12 +73,12 @@ func NewProcessorUtilityQuery() (*PDHQuery, error) {
 func (q *PDHQuery) Collect() (float64, error) {
 	r, _, err := procPdhCollectQueryData.Call(uintptr(q.query))
 	if r != 0 {
-		return 0, fmt.Errorf("PdhCollectQueryData failed: %v", err)
+		return 0, log.Errorf("PdhCollectQueryData failed: %v", err)
 	}
 
 	var value PDH_FMT_COUNTERVALUE_DOUBLE
 	var type_ uint32
-	
+
 	// PDH_FMT_DOUBLE = 0x00000200
 	r, _, err = procPdhGetFormattedCounterValue.Call(
 		uintptr(q.counter),
@@ -87,7 +87,7 @@ func (q *PDHQuery) Collect() (float64, error) {
 		uintptr(unsafe.Pointer(&value)),
 	)
 	if r != 0 {
-		return 0, fmt.Errorf("PdhGetFormattedCounterValue failed: %v", err)
+		return 0, log.Errorf("PdhGetFormattedCounterValue failed: %v", err)
 	}
 
 	return value.DoubleValue, nil

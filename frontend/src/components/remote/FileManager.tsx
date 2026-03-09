@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Folder, File, ArrowUp, RefreshCw, Upload, Download, Home, FileText, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 // @ts-ignore
 import { ListRemoteFiles, UploadFile, DownloadFile, SelectFile, SelectSaveFile, RemoveRemoteFile } from '../../../wailsjs/go/app/App';
 
@@ -15,35 +15,6 @@ interface FileInfo {
 
 interface FileManagerProps {
     hostId: number;
-}
-
-// Simple Confirm Dialog Component
-function ConfirmDialog({ open, title, content, onConfirm, onCancel, loading }: { 
-    open: boolean, 
-    title: string, 
-    content: string, 
-    onConfirm: () => void, 
-    onCancel: () => void,
-    loading?: boolean
-}) {
-    if (!open) return null;
-    return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onCancel} />
-            <div className="relative bg-background p-6 rounded-lg shadow-xl w-[400px] border z-50 animate-in zoom-in-95 duration-200">
-                <h3 className="text-lg font-bold mb-2">{title}</h3>
-                <p className="text-muted-foreground mb-6">{content}</p>
-                <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={onCancel} disabled={loading}>取消</Button>
-                    <Button variant="destructive" onClick={onConfirm} disabled={loading}>
-                        {loading ? <RefreshCw size={16} className="animate-spin mr-2" /> : null}
-                        {loading ? '删除中...' : '删除'}
-                    </Button>
-                </div>
-            </div>
-        </div>,
-        document.body
-    );
 }
 
 export function FileManager({ hostId }: FileManagerProps) {
@@ -403,7 +374,7 @@ export function FileManager({ hostId }: FileManagerProps) {
             {/* Confirm Delete Dialog */}
             <ConfirmDialog 
                 open={!!fileToDelete} 
-                title="确认删除" 
+                title="确认删除？" 
                 content={`确定要删除 ${fileToDelete?.name} 吗？此操作不可恢复。`}
                 onConfirm={confirmDelete}
                 onCancel={() => setFileToDelete(null)}

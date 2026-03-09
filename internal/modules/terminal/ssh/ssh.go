@@ -1,13 +1,13 @@
 package ssh
 
 import (
+	"GoT0Emergency/internal/pkg/log"
 	"context"
 	"encoding/base64"
-	"fmt"
 	"io"
 
-	"golang.org/x/crypto/ssh"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/crypto/ssh"
 )
 
 type SSHTerminal struct {
@@ -21,7 +21,7 @@ type SSHTerminal struct {
 func NewSSHTerminal(ctx context.Context, client *ssh.Client, id string, rows, cols int) (*SSHTerminal, error) {
 	session, err := client.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, log.Errorf("failed to create session: %w", err)
 	}
 
 	modes := ssh.TerminalModes{
@@ -32,7 +32,7 @@ func NewSSHTerminal(ctx context.Context, client *ssh.Client, id string, rows, co
 
 	if err := session.RequestPty("xterm-256color", rows, cols, modes); err != nil {
 		session.Close()
-		return nil, fmt.Errorf("request for pty failed: %w", err)
+		return nil, log.Errorf("request for pty failed: %w", err)
 	}
 
 	stdin, err := session.StdinPipe()
@@ -46,13 +46,13 @@ func NewSSHTerminal(ctx context.Context, client *ssh.Client, id string, rows, co
 		session.Close()
 		return nil, err
 	}
-	
+
 	// Merge stderr into stdout for simple terminal
 	session.Stderr = session.Stdout
 
 	if err := session.Shell(); err != nil {
 		session.Close()
-		return nil, fmt.Errorf("failed to start shell: %w", err)
+		return nil, log.Errorf("failed to start shell: %w", err)
 	}
 
 	t := &SSHTerminal{

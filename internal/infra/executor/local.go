@@ -2,9 +2,10 @@ package executor
 
 import (
 	"bytes"
-	"fmt"
 	"os/exec"
 	"runtime"
+
+	"GoT0Emergency/internal/pkg/log"
 )
 
 type LocalExecutor struct{}
@@ -27,7 +28,7 @@ func (e *LocalExecutor) Exec(cmdStr string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("local exec failed: %w, stderr: %s", err, stderr.String())
+		return "", log.Errorf("local exec failed: %w, stderr: %s", err, stderr.String())
 	}
 
 	return stdout.String(), nil

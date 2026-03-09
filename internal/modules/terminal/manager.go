@@ -1,7 +1,7 @@
 package terminal
 
 import (
-	"fmt"
+	"GoT0Emergency/internal/pkg/log"
 	"sync"
 	"time"
 )
@@ -41,5 +41,5 @@ func (m *Manager) Remove(id string) {
 
 // GenerateID creates a simple unique ID
 func GenerateID() string {
-	return fmt.Sprintf("term_%d", time.Now().UnixNano())
+	return log.Sprintf("term_%d", time.Now().UnixNano())
 }

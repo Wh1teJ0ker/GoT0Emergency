@@ -1,16 +1,26 @@
 package log
 
 import (
+	"GoT0Emergency/internal/pkg/path"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"GoT0Emergency/internal/pkg/path"
 )
 
 var logger *slog.Logger
+
+// Wrapper for fmt.Errorf
+func Errorf(format string, args ...any) error {
+	return fmt.Errorf(format, args...)
+}
+
+// Wrapper for fmt.Sprintf
+func Sprintf(format string, args ...any) string {
+	return fmt.Sprintf(format, args...)
+}
 
 func Init() error {
 	logFile := GetLogPath()

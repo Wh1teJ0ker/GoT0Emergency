@@ -142,7 +142,6 @@ func (t *LocalTerminal) Wait() error {
 	return nil
 }
 
-// 辅助函数：Int 转 String，替代 fmt.Sprintf
 func itoa(i int) string {
 	return strconv.Itoa(i)
 }

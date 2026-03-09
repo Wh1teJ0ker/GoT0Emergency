@@ -1,8 +1,8 @@
 package executor
 
 import (
+	"GoT0Emergency/internal/pkg/log"
 	"bytes"
-	"fmt"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -18,12 +18,12 @@ func NewSSHExecutor(client *ssh.Client) *SSHExecutor {
 
 func (e *SSHExecutor) Exec(cmdStr string) (string, error) {
 	if e.client == nil {
-		return "", fmt.Errorf("ssh client is nil")
+		return "", log.Errorf("ssh client is nil")
 	}
 
 	session, err := e.client.NewSession()
 	if err != nil {
-		return "", fmt.Errorf("failed to create session: %w", err)
+		return "", log.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
 
@@ -33,7 +33,7 @@ func (e *SSHExecutor) Exec(cmdStr string) (string, error) {
 
 	err = session.Run(cmdStr)
 	if err != nil {
-		return "", fmt.Errorf("ssh exec failed: %w, stderr: %s", err, stderr.String())
+		return "", log.Errorf("ssh exec failed: %w, stderr: %s", err, stderr.String())
 	}
 
 	return stdout.String(), nil
@@ -57,6 +57,6 @@ func ConnectSSH(ip string, port int, user string, authMethods []ssh.AuthMethod) 
 		},
 	}
 
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := log.Sprintf("%s:%d", ip, port)
 	return ssh.Dial("tcp", addr, config)
 }

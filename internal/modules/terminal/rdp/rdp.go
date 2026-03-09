@@ -1,7 +1,7 @@
 package rdp
 
 import (
-	"fmt"
+	"GoT0Emergency/internal/pkg/log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +20,7 @@ type RDPConfig struct {
 func GenerateRDPFile(config RDPConfig, path string) error {
 	// RDP file format: key:type:value
 	// types: i (integer), s (string), b (binary)
-	content := fmt.Sprintf(`full address:s:%s:%d
+	content := log.Sprintf(`full address:s:%s:%d
 username:s:%s
 screen mode id:i:2
 desktopwidth:i:%d
@@ -69,9 +69,9 @@ authentication level:i:2
 
 func LaunchRDP(config RDPConfig) error {
 	// Create a temporary .rdp file
-	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("got0_%s_%d.rdp", config.Host, config.Port))
+	tmpFile := filepath.Join(os.TempDir(), log.Sprintf("got0_%s_%d.rdp", config.Host, config.Port))
 	if err := GenerateRDPFile(config, tmpFile); err != nil {
-		return fmt.Errorf("failed to generate RDP file: %w", err)
+		return log.Errorf("failed to generate RDP file: %w", err)
 	}
 
 	var cmd *exec.Cmd
@@ -87,11 +87,11 @@ func LaunchRDP(config RDPConfig) error {
 		// Try generic open first
 		cmd = exec.Command("xdg-open", tmpFile)
 	default:
-		return fmt.Errorf("unsupported OS for RDP launch")
+		return log.Errorf("unsupported OS for RDP launch")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to launch RDP client: %w", err)
+		return log.Errorf("failed to launch RDP client: %w", err)
 	}
 
 	return nil

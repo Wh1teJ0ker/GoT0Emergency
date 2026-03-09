@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"runtime"
 	"sort"
@@ -28,8 +27,6 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 )
-
-// --- Struct Definitions ---
 
 type HostStatus struct {
 	System   SystemInfo   `json:"system"`
@@ -257,7 +254,7 @@ func (s *Service) cleanup() {
 	hours := s.settings.GetRetentionHours()
 	cutoff := time.Now().Add(-time.Duration(hours) * time.Hour)
 
-	log.Info(fmt.Sprintf("Cleaning up old metrics, retention_hours: %d, cutoff: %v", hours, cutoff))
+	log.Info(log.Sprintf("Cleaning up old metrics, retention_hours: %d, cutoff: %v", hours, cutoff))
 
 	query := "DELETE FROM host_metrics WHERE created_at < ?"
 	res, err := db.DB.Exec(query, cutoff)
@@ -338,7 +335,7 @@ type MetricPoint struct {
 func (s *Service) GetHostMetrics(hostID int64, durationStr string) ([]MetricPoint, error) {
 	duration, err := time.ParseDuration(durationStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid duration: %w", err)
+		return nil, log.Errorf("invalid duration: %w", err)
 	}
 
 	cutoff := time.Now().Add(-duration)
@@ -351,7 +348,7 @@ func (s *Service) GetHostMetrics(hostID int64, durationStr string) ([]MetricPoin
 
 	rows, err := db.DB.Query(query, hostID, cutoff)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query metrics: %w", err)
+		return nil, log.Errorf("failed to query metrics: %w", err)
 	}
 	defer rows.Close()
 
@@ -399,7 +396,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	if err == nil {
 		status.System.Hostname = hInfo.Hostname
 		status.System.OS = hInfo.OS
-		status.System.Platform = fmt.Sprintf("%s %s", hInfo.Platform, hInfo.PlatformVersion)
+		status.System.Platform = log.Sprintf("%s %s", hInfo.Platform, hInfo.PlatformVersion)
 		status.System.KernelArch = hInfo.KernelArch
 		status.System.BootTime = hInfo.BootTime
 		status.System.Uptime = hInfo.Uptime
@@ -470,7 +467,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 		// Use PDH for Processor Queue Length on Windows
 		qLen, err := s.pdhQuery.Collect()
 		if err == nil {
-			status.CPU.LoadAvg = fmt.Sprintf("%.0f (Queue Length)", qLen)
+			status.CPU.LoadAvg = log.Sprintf("%.0f (Queue Length)", qLen)
 		} else {
 			// Try re-initializing if failed?
 			// For now just log
@@ -480,7 +477,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	} else {
 		lAvg, err := load.Avg()
 		if err == nil {
-			status.CPU.LoadAvg = fmt.Sprintf("%.2f, %.2f, %.2f", lAvg.Load1, lAvg.Load5, lAvg.Load15)
+			status.CPU.LoadAvg = log.Sprintf("%.2f, %.2f, %.2f", lAvg.Load1, lAvg.Load5, lAvg.Load15)
 		} else {
 			status.CPU.LoadAvg = "N/A"
 		}
@@ -630,15 +627,15 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 	}
 	bios, err := ghw.BIOS()
 	if err == nil {
-		status.Hardware.BIOS = fmt.Sprintf("%s %s", bios.Vendor, bios.Version)
+		status.Hardware.BIOS = log.Sprintf("%s %s", bios.Vendor, bios.Version)
 	}
 	chassis, err := ghw.Chassis()
 	if err == nil {
-		status.Hardware.Chassis = fmt.Sprintf("%s %s", chassis.Vendor, chassis.Type)
+		status.Hardware.Chassis = log.Sprintf("%s %s", chassis.Vendor, chassis.Type)
 	}
 	memHW, err := ghw.Memory()
 	if err == nil {
-		status.Hardware.MemoryModel = fmt.Sprintf("Total Physical: %d MB", memHW.TotalPhysicalBytes/1024/1024)
+		status.Hardware.MemoryModel = log.Sprintf("Total Physical: %d MB", memHW.TotalPhysicalBytes/1024/1024)
 	}
 	block, err := ghw.Block()
 	if err == nil {
@@ -658,7 +655,7 @@ func (s *Service) checkLocal() (*HostStatus, error) {
 
 func (s *Service) checkRemote(hostID int64) (*HostStatus, error) {
 	if !s.sessionManager.IsConnected(hostID) {
-		return nil, fmt.Errorf("host not connected")
+		return nil, log.Errorf("host not connected")
 	}
 
 	exec, err := s.sessionManager.GetExecutor(hostID)
@@ -747,7 +744,7 @@ func (s *Service) checkWindowsRemote(exec executor.Executor, status *HostStatus)
 	// Uptime
 	out, _ = exec.Exec("powershell \"(Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalDays\"")
 	if days, err := strconv.ParseFloat(strings.TrimSpace(out), 64); err == nil {
-		status.System.UptimeStr = fmt.Sprintf("%.1f days", days)
+		status.System.UptimeStr = log.Sprintf("%.1f days", days)
 		status.System.Uptime = uint64(days * 24 * 3600)
 		status.System.BootTime = uint64(time.Now().Unix()) - status.System.Uptime
 	}
@@ -927,7 +924,7 @@ func (s *Service) checkWindowsRemote(exec executor.Executor, status *HostStatus)
 	}
 	status.Hardware.DiskModel = strings.Join(diskModels, ", ")
 
-	status.Hardware.MemoryModel = fmt.Sprintf("Total: %d MB", status.Memory.Total/1024/1024)
+	status.Hardware.MemoryModel = log.Sprintf("Total: %d MB", status.Memory.Total/1024/1024)
 
 	return status, nil
 }
@@ -1048,7 +1045,7 @@ func (s *Service) checkLinuxRemote(exec executor.Executor, status *HostStatus) (
 	var usages []float64
 	// We need to iterate in order cpu0, cpu1...
 	for i := 0; i < status.CPU.CoresLogical; i++ {
-		name := fmt.Sprintf("cpu%d", i)
+		name := log.Sprintf("cpu%d", i)
 		if s1, ok := stats1[name]; ok {
 			if s2, ok := stats2[name]; ok {
 				totalDelta := s2.total - s1.total
@@ -1163,10 +1160,10 @@ func (s *Service) checkLinuxRemote(exec executor.Executor, status *HostStatus) (
 			tx, _ := strconv.ParseUint(parts[2], 10, 64)
 
 			// Get IP
-			ipOut, _ := exec.Exec(fmt.Sprintf("ip -4 addr show %s | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}' | head -1", name))
+			ipOut, _ := exec.Exec(log.Sprintf("ip -4 addr show %s | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}' | head -1", name))
 			if ipOut == "" {
 				// Fallback
-				ipOut, _ = exec.Exec(fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d/ -f1", name))
+				ipOut, _ = exec.Exec(log.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d/ -f1", name))
 			}
 
 			status.Network.Interfaces = append(status.Network.Interfaces, InterfaceInfo{
@@ -1272,7 +1269,7 @@ func (s *Service) checkLinuxRemote(exec executor.Executor, status *HostStatus) (
 	vendor := strings.TrimSpace(out)
 	out, _ = exec.Exec("cat /sys/class/dmi/id/board_name")
 	name := strings.TrimSpace(out)
-	status.Hardware.Motherboard = fmt.Sprintf("%s %s", vendor, name)
+	status.Hardware.Motherboard = log.Sprintf("%s %s", vendor, name)
 
 	out, _ = exec.Exec("cat /sys/class/dmi/id/bios_version")
 	status.Hardware.BIOS = strings.TrimSpace(out)
@@ -1291,7 +1288,7 @@ func (s *Service) checkLinuxRemote(exec executor.Executor, status *HostStatus) (
 	// Memory Model: dmidecode -t memory | grep "Part Number" (Needs root)
 	// lshw -short -C memory (Needs root)
 	// Fallback to just size
-	status.Hardware.MemoryModel = fmt.Sprintf("Total: %d MB", status.Memory.Total/1024/1024)
+	status.Hardware.MemoryModel = log.Sprintf("Total: %d MB", status.Memory.Total/1024/1024)
 
 	return status, nil
 }

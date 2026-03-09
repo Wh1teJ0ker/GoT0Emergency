@@ -2,10 +2,10 @@ package host
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	"GoT0Emergency/internal/infra/db"
+	"GoT0Emergency/internal/pkg/log"
 )
 
 type Host struct {
@@ -34,7 +34,7 @@ func (s *Service) CreateHost(h *Host) error {
 	`
 	res, err := db.DB.Exec(query, h.Name, h.IP, h.Port, h.Username, h.AuthType, h.Password, h.KeyPath)
 	if err != nil {
-		return fmt.Errorf("failed to create host: %w", err)
+		return log.Errorf("failed to create host: %w", err)
 	}
 	id, _ := res.LastInsertId()
 	h.ID = id
@@ -45,7 +45,7 @@ func (s *Service) GetHosts() ([]Host, error) {
 	query := `SELECT id, name, ip, port, username, auth_type, password, key_path, last_connected_at, created_at FROM hosts`
 	rows, err := db.DB.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query hosts: %w", err)
+		return nil, log.Errorf("failed to query hosts: %w", err)
 	}
 	defer rows.Close()
 
@@ -81,7 +81,7 @@ func (s *Service) GetHost(id int64) (*Host, error) {
 	err := row.Scan(&h.ID, &h.Name, &h.IP, &h.Port, &h.Username, &h.AuthType, &h.Password, &h.KeyPath, &lastConn, &created)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("host not found")
+			return nil, log.Errorf("host not found")
 		}
 		return nil, err
 	}

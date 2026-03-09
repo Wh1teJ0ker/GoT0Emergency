@@ -4,6 +4,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { Card, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { RefreshCw, Trash2, Calendar, Search, Filter } from "lucide-react";
 // @ts-ignore
 import { GetLogsByDate, GetLogFiles, ClearLogs } from "../../wailsjs/go/app/App";
@@ -30,6 +31,7 @@ export function LogsPage() {
     const [dates, setDates] = useState<string[]>([]);
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
     
     // Filters
     const [searchQuery, setSearchQuery] = useState("");
@@ -74,9 +76,12 @@ export function LogsPage() {
         }
     };
 
-    const handleClear = async () => {
-        if (!confirm("确定要清空所有日志吗？")) return;
-        
+    const handleClearClick = () => {
+        setIsClearDialogOpen(true);
+    };
+
+    const handleClearConfirm = async () => {
+        setIsClearDialogOpen(false);
         try {
             await ClearLogs();
             loadLogs(selectedDate); // Reload current
@@ -143,12 +148,22 @@ export function LogsPage() {
                             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                             刷新
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={handleClear}>
+                        <Button variant="destructive" size="sm" onClick={handleClearClick}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             清空
                         </Button>
                     </div>
                 </div>
+
+                <ConfirmDialog 
+                    open={isClearDialogOpen}
+                    title="确认清空？"
+                    content="此操作将永久删除当前的所有日志文件。此操作不可恢复。"
+                    onConfirm={handleClearConfirm}
+                    onCancel={() => setIsClearDialogOpen(false)}
+                    confirmText="确认清空"
+                    loadingText="清空中..."
+                />
 
                 {/* Toolbar */}
                 <Card className="p-3 bg-card/50">

@@ -2,7 +2,6 @@ package settings
 
 import (
 	"database/sql"
-	"fmt"
 	"strconv"
 
 	"GoT0Emergency/internal/infra/db"
@@ -25,7 +24,7 @@ func (s *Service) Get(key string) (string, error) {
 		return "", nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("failed to get setting %s: %w", key, err)
+		return "", log.Errorf("failed to get setting %s: %w", key, err)
 	}
 	return value, nil
 }
@@ -33,7 +32,7 @@ func (s *Service) Get(key string) (string, error) {
 func (s *Service) Set(key, value string) error {
 	_, err := db.DB.Exec("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)", key, value)
 	if err != nil {
-		return fmt.Errorf("failed to set setting %s: %w", key, err)
+		return log.Errorf("failed to set setting %s: %w", key, err)
 	}
 	return nil
 }
@@ -57,7 +56,7 @@ func (s *Service) GetRetentionHours() int {
 
 func (s *Service) SetRetentionHours(hours int) error {
 	if hours <= 0 {
-		return fmt.Errorf("retention hours must be positive")
+		return log.Errorf("retention hours must be positive")
 	}
 	return s.Set(KeyRetentionHours, strconv.Itoa(hours))
 }

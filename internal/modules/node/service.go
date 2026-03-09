@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,7 +39,7 @@ func (s *Service) GetPlugins() ([]Plugin, error) {
 	moduleDir := filepath.Join(s.projectRoot, "cmd/node/modules")
 	entries, err := os.ReadDir(moduleDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read modules directory (%s): %w", moduleDir, err)
+		return nil, log.Errorf("failed to read modules directory (%s): %w", moduleDir, err)
 	}
 
 	var plugins []Plugin
@@ -71,16 +70,16 @@ func (s *Service) CreatePlugin(name, description string) error {
 	// 1. Validate name (alphanumeric, lowercase)
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
-		return fmt.Errorf("plugin name cannot be empty")
+		return log.Errorf("plugin name cannot be empty")
 	}
 
 	moduleDir := filepath.Join(s.projectRoot, "cmd/node/modules", name)
 	if _, err := os.Stat(moduleDir); !os.IsNotExist(err) {
-		return fmt.Errorf("plugin %s already exists", name)
+		return log.Errorf("plugin %s already exists", name)
 	}
 
 	if err := os.MkdirAll(moduleDir, 0755); err != nil {
-		return fmt.Errorf("failed to create plugin directory: %w", err)
+		return log.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	// 2. Create files
@@ -103,14 +102,14 @@ func (s *Service) GetPluginSource(name string) (string, error) {
 	// 1. Construct path
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
-		return "", fmt.Errorf("plugin name cannot be empty")
+		return "", log.Errorf("plugin name cannot be empty")
 	}
 
 	// We assume the main logic is in {name}.go
 	filePath := filepath.Join(s.projectRoot, "cmd/node/modules", name, name+".go")
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read plugin source: %w", err)
+		return "", log.Errorf("failed to read plugin source: %w", err)
 	}
 
 	return string(content), nil
@@ -119,25 +118,25 @@ func (s *Service) GetPluginSource(name string) (string, error) {
 func (s *Service) SavePluginSource(name, content string) error {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
-		return fmt.Errorf("plugin name cannot be empty")
+		return log.Errorf("plugin name cannot be empty")
 	}
 
 	filePath := filepath.Join(s.projectRoot, "cmd/node/modules", name, name+".go")
 
 	// Basic security check: ensure we are writing to the correct directory
 	if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(filepath.Join(s.projectRoot, "cmd/node/modules"))) {
-		return fmt.Errorf("invalid file path")
+		return log.Errorf("invalid file path")
 	}
 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to save plugin source: %w", err)
+		return log.Errorf("failed to save plugin source: %w", err)
 	}
 
 	return nil
 }
 
 func (s *Service) createPluginFile(dir, name, description string) error {
-	content := fmt.Sprintf(`//go:build feat_%[1]s
+	content := log.Sprintf(`//go:build feat_%[1]s
 
 package %[1]s
 
@@ -168,7 +167,7 @@ func init() {
 }
 
 func (s *Service) createStubFile(dir, name string) error {
-	content := fmt.Sprintf(`//go:build !feat_%[1]s
+	content := log.Sprintf(`//go:build !feat_%[1]s
 
 package %[1]s
 
@@ -193,7 +192,7 @@ func (s *Service) registerInMain(name string) error {
 	importFound := false
 
 	// Check if already imported (shouldn't happen if dir didn't exist, but safe check)
-	importPath := fmt.Sprintf(`	_ "GoT0Emergency/cmd/node/modules/%s"`, name)
+	importPath := log.Sprintf(`	_ "GoT0Emergency/cmd/node/modules/%s"`, name)
 
 	for _, line := range lines {
 		newLines = append(newLines, line)
@@ -245,10 +244,10 @@ func (s *Service) BuildNode(features []string, targetOS string, targetArch strin
 	// Get file size
 	info, err := os.Stat(outputPath)
 	if err != nil {
-		return "", fmt.Errorf("built successfully but failed to stat output file: %v", err)
+		return "", log.Errorf("built successfully but failed to stat output file: %v", err)
 	}
 
-	msg := fmt.Sprintf("Node built successfully! Path: %s, Size: %.2f MB", outputPath, float64(info.Size())/1024/1024)
+	msg := log.Sprintf("Node built successfully! Path: %s, Size: %.2f MB", outputPath, float64(info.Size())/1024/1024)
 	log.Info("Node build complete", "path", outputPath, "size_bytes", info.Size())
 	return msg, nil
 }
@@ -257,21 +256,21 @@ func (s *Service) Build(features []string, targetOS string, targetArch string) (
 	// Security check
 	for _, f := range features {
 		if !strings.HasPrefix(f, "feat_") {
-			return "", fmt.Errorf("invalid feature tag: %s", f)
+			return "", log.Errorf("invalid feature tag: %s", f)
 		}
 	}
 
 	tags := strings.Join(features, " ")
 	nodeDir := path.GetNodeDir()
-	outputPath := filepath.Join(nodeDir, fmt.Sprintf("node_%s_%s", targetOS, targetArch))
+	outputPath := filepath.Join(nodeDir, log.Sprintf("node_%s_%s", targetOS, targetArch))
 	if targetOS == "windows" {
 		outputPath += ".exe"
 	}
 
 	// Environment variables
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("GOOS=%s", targetOS))
-	env = append(env, fmt.Sprintf("GOARCH=%s", targetArch))
+	env = append(env, log.Sprintf("GOOS=%s", targetOS))
+	env = append(env, log.Sprintf("GOARCH=%s", targetArch))
 
 	args := []string{"build", "-tags", tags, "-ldflags", "-s -w", "-o", outputPath, "./cmd/node"}
 	cmd := exec.Command("go", args...)
@@ -280,7 +279,7 @@ func (s *Service) Build(features []string, targetOS string, targetArch string) (
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Error("Node build failed", "err", err, "output", string(output))
-		return "", fmt.Errorf("build failed: %v, output: %s", err, string(output))
+		return "", log.Errorf("build failed: %v, output: %s", err, string(output))
 	}
 
 	return outputPath, nil
