@@ -4,13 +4,18 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Database, RefreshCw } from "lucide-react";
+import { useToast } from "../components/ui/ToastProvider";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+// @ts-ignore
 import { InitDB, GetDBPath, GetRetentionHours, SetRetentionHours } from "../../wailsjs/go/app/App";
 
 export function SettingsPage() {
+    const toast = useToast();
     const [dbPath, setDbPath] = useState("");
     const [retentionHours, setRetentionHours] = useState(24);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [isInitDialogOpen, setIsInitDialogOpen] = useState(false);
 
     useEffect(() => {
         loadDBPath();
@@ -30,10 +35,10 @@ export function SettingsPage() {
         setSaving(true);
         try {
             await SetRetentionHours(retentionHours);
-            alert("设置保存成功！");
+            toast.success('设置已保存');
         } catch (err) {
             console.error("Failed to save retention hours:", err);
-            alert("保存失败: " + err);
+            toast.error('设置保存失败', String(err));
         } finally {
             setSaving(false);
         }
@@ -49,25 +54,34 @@ export function SettingsPage() {
     };
 
     const handleInitDB = async () => {
-        if (!confirm("确定要初始化数据库吗？这将重置所有数据！")) return;
-        
         setLoading(true);
         try {
             await InitDB();
-            alert("数据库初始化成功！");
+            toast.success('数据库初始化完成');
         } catch (err) {
             console.error("Init DB failed:", err);
-            alert("初始化失败: " + err);
+            toast.error('数据库初始化失败', String(err));
         } finally {
             setLoading(false);
+            setIsInitDialogOpen(false);
         }
     };
 
     return (
         <PageContainer>
-            <PageHeader 
-                title="设置" 
+            <PageHeader
+                title="设置"
                 description="管理您的偏好和应用设置。"
+            />
+
+            <ConfirmDialog
+                open={isInitDialogOpen}
+                title="确认初始化数据库？"
+                content="此操作将重置数据库结构，所有现有数据将丢失！"
+                onConfirm={handleInitDB}
+                onCancel={() => setIsInitDialogOpen(false)}
+                confirmText="确认初始化"
+                loadingText="初始化中..."
             />
 
             <div className="grid gap-6">
@@ -80,15 +94,15 @@ export function SettingsPage() {
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center gap-4">
                                 <label className="text-sm font-medium whitespace-nowrap">监测数据保留时间（小时）</label>
-                                <input 
-                                    type="number" 
+                                <input
+                                    type="number"
                                     min="1"
                                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     value={retentionHours}
                                     onChange={(e) => setRetentionHours(parseInt(e.target.value) || 24)}
                                 />
                             </div>
-                            <Button 
+                            <Button
                                 onClick={handleSaveRetention}
                                 disabled={saving}
                                 className="w-full sm:w-auto self-start"
@@ -111,11 +125,11 @@ export function SettingsPage() {
                                 {dbPath || "加载中..."}
                             </div>
                         </div>
-                        
+
                         <div className="pt-4 border-t">
-                            <Button 
-                                variant="destructive" 
-                                onClick={handleInitDB} 
+                            <Button
+                                variant="destructive"
+                                onClick={() => setIsInitDialogOpen(true)}
                                 disabled={loading}
                                 className="w-full sm:w-auto"
                             >

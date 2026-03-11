@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os/exec"
 	stdRuntime "runtime"
+	"strings"
+	"time"
 
 	"GoT0Emergency/internal/infra/db"
 	"GoT0Emergency/internal/infra/executor"
@@ -91,16 +93,23 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 func (a *App) startCallbackServer(port int) {
+	log.Info("Starting callback server", "port", port)
+
 	// Use a new ServeMux to avoid global state issues if called multiple times or conflicting
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/callback", func(w http.ResponseWriter, r *http.Request) {
+		log.Info("Callback request received", "method", r.Method, "url", r.URL.String(), "remote_addr", r.RemoteAddr)
+
 		// Read body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			log.Error("Failed to read callback body", "err", err)
 			http.Error(w, "Failed to read body", http.StatusBadRequest)
 			return
 		}
 		defer r.Body.Close()
+
+		log.Info("Callback body read", "size", len(body), "raw", string(body))
 
 		// Unmarshal
 		var data map[string]interface{}
@@ -112,7 +121,7 @@ func (a *App) startCallbackServer(port int) {
 
 		// Log callback
 		hostname, _ := data["hostname"].(string)
-		log.Info("Received node callback", "remote_ip", r.RemoteAddr, "host", hostname)
+		log.Info("Received node callback", "remote_ip", r.RemoteAddr, "host", hostname, "data", data)
 
 		// Add remote IP
 		data["remote_ip"] = r.RemoteAddr
@@ -120,6 +129,9 @@ func (a *App) startCallbackServer(port int) {
 		// Emit event to frontend with data
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "node:callback", data)
+			log.Info("Emitted callback event to frontend")
+		} else {
+			log.Error("App context is nil, cannot emit event")
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -131,6 +143,7 @@ func (a *App) startCallbackServer(port int) {
 		Handler: mux,
 	}
 
+	log.Info("Callback server listening", "addr", server.Addr)
 	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Error("Failed to start callback server", "err", err)
@@ -258,51 +271,105 @@ func (a *App) BuildNode(features []string, targetOS string, targetArch string) (
 }
 
 func (a *App) DeployNode(hostID int64, targetOS, targetArch string) (string, error) {
+	log.Info("DeployNode called", "host_id", hostID, "os", targetOS, "arch", targetArch)
+
 	// 1. Build Node (default features)
 	features := []string{"feat_host_monitor"} // Default features
+	log.Info("Building node...", "features", features)
 	nodePath, err := a.nodeService.Build(features, targetOS, targetArch)
 	if err != nil {
+		log.Error("Node build failed", "error", err)
 		return "", err
 	}
+	log.Info("Node built successfully", "path", nodePath)
 
-	// 2. Upload Node
-	remotePath := "/tmp/got0_node" // Default for Linux
-	if targetOS == "windows" {
-		remotePath = "C:\\Windows\\Temp\\got0_node.exe"
-	}
-
-	err = a.sessionManager.UploadFile(hostID, nodePath, remotePath, false)
+	// 2. Connect first to get executor and determine remote path
+	log.Info("Connecting to host...", "host_id", hostID)
+	err = a.sessionManager.Connect(hostID)
 	if err != nil {
-		return "", log.Errorf("upload failed: %w", err)
+		log.Error("Failed to connect to host", "error", err)
+		return "", log.Errorf("failed to connect: %w", err)
 	}
-
-	// 3. Execute Node (in background)
-	// Setup port forwarding if connected
-	if a.sessionManager.IsConnected(hostID) {
-		// Forward remote 36911 to local 36911
-		// Ignore error if already forwarded or failed (node will just fail to callback, but run)
-		_ = a.sessionManager.ForwardRemotePort(hostID, 36911, 36911)
-	}
-
-	cmdStr := log.Sprintf("nohup %s -callback http://localhost:36911/api/callback > /dev/null 2>&1 &", remotePath)
-	if targetOS == "windows" {
-		// PowerShell Start-Process
-		cmdStr = log.Sprintf("powershell -Command \"Start-Process -FilePath '%s' -ArgumentList '-callback http://localhost:36911/api/callback' -WindowStyle Hidden\"", remotePath)
-	}
+	log.Info("Connected to host successfully")
 
 	executor, err := a.sessionManager.GetExecutor(hostID)
 	if err != nil {
+		log.Error("Failed to get executor", "error", err)
 		return "", err
 	}
 
-	_, err = executor.Exec(cmdStr)
-	// Note: nohup returns immediately usually.
+	// Determine remote path - use home directory to avoid /tmp permission issues
+	var remotePath string
+	if targetOS == "windows" {
+		remotePath = "C:\\Windows\\Temp\\got0_node.exe"
+	} else {
+		// Expand ~ to actual home directory
+		output, err := executor.Exec("echo $HOME")
+		if err != nil {
+			log.Error("Failed to get home directory, using /tmp as fallback", "error", err)
+			remotePath = "/tmp/got0_node"
+		} else {
+			homeDir := strings.TrimSpace(output)
+			dirPath := homeDir + "/got0_node"
+			log.Info("Using home directory for node", "home", homeDir, "dir", dirPath)
+
+			// Remove existing directory first to ensure clean state
+			_, _ = executor.Exec("rm -rf " + dirPath)
+			log.Info("Removed existing directory if any", "dir", dirPath)
+
+			// Create directory
+			_, err = executor.Exec("mkdir -p " + dirPath)
+			if err != nil {
+				log.Error("Failed to create remote directory, using /tmp as fallback", "error", err)
+				dirPath = "/tmp/got0_node"
+				_, _ = executor.Exec("rm -rf " + dirPath)
+				_, err = executor.Exec("mkdir -p " + dirPath)
+			}
+			remotePath = dirPath
+		}
+	}
+
+	// For non-Windows, the remotePath is now a directory, append the filename
+	if targetOS != "windows" {
+		remotePath = remotePath + "/node"
+	}
+
+	log.Info("Uploading node...", "remote_path", remotePath)
+	err = a.sessionManager.UploadFile(hostID, nodePath, remotePath, false)
+	if err != nil {
+		log.Error("Upload failed", "error", err)
+		return "", log.Errorf("upload failed: %w", err)
+	}
+	log.Info("Node uploaded successfully", "remote_path", remotePath)
+
+	// 3. Setup port forwarding BEFORE executing node
+	log.Info("Setting up remote port forwarding", "host_id", hostID, "remote_port", 36911, "local_port", 36911)
+	err = a.sessionManager.ForwardRemotePort(hostID, 36911, 36911)
+	if err != nil {
+		log.Error("Failed to setup remote port forwarding. Node will be unable to callback.", "host_id", hostID, "error", err)
+		return "", log.Errorf("failed to setup remote port forwarding: %w", err)
+	}
+	log.Info("Remote port forwarding setup successfully")
+
+	// 4. Execute Node (in background)
+	var cmdStr string
+	if targetOS == "windows" {
+		cmdStr = log.Sprintf("powershell -Command \"Start-Process -FilePath '%s' -ArgumentList '-callback http://127.0.0.1:36911/api/callback' -WindowStyle Hidden -RedirectStandardOutput 'C:\\Windows\\Temp\\got0_node.log' -RedirectStandardError 'C:\\Windows\\Temp\\got0_node.err'\"", remotePath)
+	} else {
+		cmdStr = log.Sprintf("nohup %s -callback http://127.0.0.1:36911/api/callback > %s.log 2>&1 &", remotePath, remotePath)
+	}
+
+	log.Info("Executing node command", "cmd", cmdStr)
+	output, err := executor.Exec(cmdStr)
+	log.Info("Node execution result", "output", output, "error", err)
 
 	if err != nil {
 		log.Error("Failed to start node", "err", err)
-		// Don't fail if just timeout or similar, but report error if command failed.
-		// return "", err
 	}
+
+	// 5. Add a small delay to allow node to start and callback
+	log.Info("Waiting for node to start and send callback...")
+	time.Sleep(2 * time.Second)
 
 	return "Node deployed and started successfully!", nil
 }

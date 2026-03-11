@@ -4,6 +4,7 @@ package host_monitor
 
 import (
 	"runtime"
+	"time"
 
 	"GoT0Emergency/cmd/node/core"
 
@@ -39,7 +40,8 @@ func (m *HostMonitorModule) Run() (interface{}, error) {
 	data := HostData{}
 
 	// CPU
-	percent, err := cpu.Percent(0, false)
+	// Use a 1-second interval to get a reliable reading.
+	percent, err := cpu.Percent(time.Second, false)
 	if err == nil && len(percent) > 0 {
 		data.CPUUsage = percent[0]
 	}

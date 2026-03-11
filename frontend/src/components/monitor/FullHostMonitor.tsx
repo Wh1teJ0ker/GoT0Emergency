@@ -438,7 +438,7 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
                                             <div className="p-3 bg-muted/30 rounded-lg">
                                                 <div className="text-xs text-muted-foreground">使用率</div>
                                                 <div className="font-medium text-sm">
-                                                    {(status.memory?.swap_total ? (status.memory.swap_used / status.memory.swap_total * 100) : 0).toFixed(1)}%
+                                                    {(status.memory?.swap_total ? (((status.memory?.swap_used || 0) / status.memory.swap_total) * 100) : 0).toFixed(1)}%
                                                 </div>
                                             </div>
                                         </div>

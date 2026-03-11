@@ -36,9 +36,13 @@ export function NodeManager() {
         const cleanup = EventsOn("node:callback", (data: any) => {
             setActiveNodes(prev => {
                 const newState = { ...prev };
-                // Use remote_ip as key
+                // Use stable key: hostname-os-ip_without_port to avoid duplicates
                 if (data && data.remote_ip) {
-                    newState[data.remote_ip] = { ...data, last_seen: Date.now() };
+                    const ipWithoutPort = data.remote_ip.split(':')[0];
+                    const key = data.hostname
+                        ? `${data.hostname}-${data.os}-${ipWithoutPort}`
+                        : `unknown-${data.os}-${Date.now()}`;
+                    newState[key] = { ...data, last_seen: Date.now(), display_ip: ipWithoutPort };
                 }
                 return newState;
             });
@@ -247,17 +251,17 @@ export function NodeManager() {
 
             {activeTab === 'live' && (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(activeNodes).map(([ip, node]: [string, any]) => {
+                    {Object.entries(activeNodes).map(([key, node]: [string, any]) => {
                         const isOnline = Date.now() - node.last_seen < 10000; // 10s threshold
                         return (
-                            <Card key={ip} className={`hover:shadow-md transition-shadow ${!isOnline ? 'opacity-60 grayscale' : ''}`}>
+                            <Card key={key} className={`hover:shadow-md transition-shadow ${!isOnline ? 'opacity-60 grayscale' : ''}`}>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-base flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Activity size={18} className={isOnline ? "text-green-500" : "text-gray-400"} />
                                             {node.hostname || 'Unknown Host'}
                                         </div>
-                                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{ip}</span>
+                                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{node.display_ip || key}</span>
                                     </CardTitle>
                                     <CardDescription className="text-xs">
                                         {node.os} / {node.arch}
@@ -267,11 +271,19 @@ export function NodeManager() {
                                     <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                                         <div className="flex flex-col">
                                             <span className="text-xs text-muted-foreground">CPU</span>
-                                            <span className="font-medium">{node.cpu_percent ? node.cpu_percent.toFixed(1) : 0}%</span>
+                                            <span className="font-medium">
+                                                {node.modules?.host_monitor?.cpu_usage
+                                                    ? node.modules.host_monitor.cpu_usage.toFixed(1) + '%'
+                                                    : '0%'}
+                                            </span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-xs text-muted-foreground">Memory</span>
-                                            <span className="font-medium">{node.mem_percent ? node.mem_percent.toFixed(1) : 0}%</span>
+                                            <span className="font-medium">
+                                                {node.modules?.host_monitor?.memory_percent
+                                                    ? node.modules.host_monitor.memory_percent.toFixed(1) + '%'
+                                                    : '0%'}
+                                            </span>
                                         </div>
                                         <div className="flex flex-col col-span-2 mt-1">
                                             <span className="text-xs text-muted-foreground">Uptime</span>

@@ -17,9 +17,10 @@ import (
 )
 
 type SessionManager struct {
-	mu          sync.RWMutex
-	connections map[int64]*ssh.Client
-	hostService *host.Service
+	mu                sync.RWMutex
+	connections       map[int64]*ssh.Client
+	remoteListeners   map[int64]net.Listener
+	hostService       *host.Service
 }
 
 type FileInfo struct {
@@ -32,6 +33,7 @@ type FileInfo struct {
 func NewSessionManager(hostService *host.Service) *SessionManager {
 	return &SessionManager{
 		connections: make(map[int64]*ssh.Client),
+		remoteListeners: make(map[int64]net.Listener),
 		hostService: hostService,
 	}
 }
@@ -162,6 +164,17 @@ func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 	return client, nil
 }
 
+// getClientUnlocked is for internal use when the session manager's mutex is already held.
+// It does NOT auto-connect and assumes the caller has locked the mutex.
+func (sm *SessionManager) getClientUnlocked(hostID int64) (*ssh.Client, error) {
+	client, ok := sm.connections[hostID]
+	if !ok {
+		// This is not an auto-connect path.
+		return nil, log.Errorf("host %d not connected (cannot auto-connect within lock)", hostID)
+	}
+	return client, nil
+}
+
 func (sm *SessionManager) Close(hostID int64) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -170,49 +183,86 @@ func (sm *SessionManager) Close(hostID int64) error {
 		client.Close()
 		delete(sm.connections, hostID)
 	}
+	if listener, ok := sm.remoteListeners[hostID]; ok {
+		listener.Close()
+		delete(sm.remoteListeners, hostID)
+	}
 	return nil
 }
 
 func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort int) error {
-	client, err := sm.GetClient(hostID)
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	if _, ok := sm.remoteListeners[hostID]; ok {
+		log.Info("Remote port already forwarded for this host", "host_id", hostID, "port", remotePort)
+		return nil // Already forwarding
+	}
+
+	client, err := sm.getClientUnlocked(hostID)
 	if err != nil {
+		log.Error("Failed to get SSH client for port forwarding", "host_id", hostID, "error", err)
 		return err
 	}
 
 	// Listen on remote port
-	// "tcp" implies listening on all interfaces on remote, or "localhost" for local only?
-	// Usually "0.0.0.0" or "localhost". "localhost" is safer.
-	listener, err := client.Listen("tcp", log.Sprintf("localhost:%d", remotePort))
+	// Try binding to 127.0.0.1 first (works without GatewayPorts)
+	// If node runs on same host, it can still connect to 127.0.0.1
+	remoteAddr := log.Sprintf("127.0.0.1:%d", remotePort)
+	log.Info("Attempting to listen on remote address", "address", remoteAddr)
+	listener, err := client.Listen("tcp", remoteAddr)
 	if err != nil {
-		return log.Errorf("failed to listen on remote port %d: %w", remotePort, err)
+		// Try fallback to 0.0.0.0 (requires GatewayPorts yes)
+		log.Error("Failed to bind to 127.0.0.1, trying 0.0.0.0 (requires GatewayPorts)", "error", err)
+		remoteAddr = log.Sprintf("0.0.0.0:%d", remotePort)
+		listener, err = client.Listen("tcp", remoteAddr)
+		if err != nil {
+			log.Error("Failed to listen on remote port", "address", remoteAddr, "error", err)
+			return log.Errorf("failed to listen on remote port %d: %w", remotePort, err)
+		}
 	}
 
+	sm.remoteListeners[hostID] = listener
+	log.Info("Started remote port forwarding", "host_id", hostID, "remote_addr", remoteAddr, "local_port", localPort)
+
 	go func() {
-		// Close listener when session closes?
-		// Ideally we track this listener to close it, but for now rely on client close.
-		// But client.Listen returns a listener that needs to be accepted.
+		defer func() {
+			sm.mu.Lock()
+			listener.Close()
+			delete(sm.remoteListeners, hostID)
+			sm.mu.Unlock()
+			log.Info("Stopped remote port forwarding", "host_id", hostID)
+		}()
+
 		for {
 			remoteConn, err := listener.Accept()
 			if err != nil {
-				return // Listener closed
+				// This error is expected when the listener is closed, so we just exit the loop.
+				log.Debug("Listener accept error, stopping forwarder", "host_id", hostID, "error", err)
+				return
 			}
 
+			log.Info("Accepted remote connection, dialing local port", "remote_addr", remoteConn.RemoteAddr(), "local_port", localPort)
 			localConn, err := net.Dial("tcp", log.Sprintf("localhost:%d", localPort))
 			if err != nil {
+				log.Error("Failed to dial local port for forwarding", "err", err)
 				remoteConn.Close()
 				continue
 			}
 
-			go func(rc, lc net.Conn) {
-				defer rc.Close()
-				defer lc.Close()
-				io.Copy(rc, lc)
-			}(remoteConn, localConn)
-			go func(rc, lc net.Conn) {
-				defer rc.Close()
-				defer lc.Close()
-				io.Copy(lc, rc)
-			}(remoteConn, localConn)
+			log.Info("Port forwarding established", "remote", remoteConn.RemoteAddr(), "local", localConn.LocalAddr())
+
+			// Bidirectional copy
+			go func() {
+				defer remoteConn.Close()
+				defer localConn.Close()
+				io.Copy(remoteConn, localConn)
+			}()
+			go func() {
+				defer remoteConn.Close()
+				defer localConn.Close()
+				io.Copy(localConn, remoteConn)
+			}()
 		}
 	}()
 

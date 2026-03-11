@@ -53,6 +53,7 @@ func main() {
 }
 
 func runOnce(callbackURL *string) {
+	log.Info("Starting data collection...")
 	status := core.AgentStatus{
 		OS: runtime.GOOS,
 	}
@@ -63,12 +64,16 @@ func runOnce(callbackURL *string) {
 		status.Hostname = hInfo.Hostname
 		status.Platform = hInfo.Platform
 		status.Uptime = hInfo.Uptime
+		log.Info("Host info collected", "hostname", status.Hostname, "platform", status.Platform, "uptime", status.Uptime)
 	} else {
+		log.Error("Failed to get host info", "error", err)
 		status.Hostname, _ = os.Hostname()
 	}
 
 	// Collect registered modules
+	log.Info("Collecting module data...")
 	core.Collect(&status)
+	log.Info("Module data collected", "modules", len(status.Modules))
 
 	// Output JSON to stdout (optional in loop mode, maybe noisy)
 	data, err := json.Marshal(status)
@@ -77,21 +82,25 @@ func runOnce(callbackURL *string) {
 		return
 	}
 
+	log.Info("Prepared callback data", "size", len(data), "data", string(data))
+
 	if callbackURL == nil {
 		os.Stdout.WriteString(string(data) + "\n")
 		return
 	}
 
 	// Send to callback
+	log.Info("Sending callback", "url", *callbackURL)
 	resp, err := http.Post(*callbackURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		log.Error("Failed to send callback", "err", err)
+		log.Error("Failed to send callback", "url", *callbackURL, "err", err)
 	} else {
 		defer resp.Body.Close()
+		log.Info("Callback response received", "status", resp.Status, "url", *callbackURL)
 		if resp.StatusCode != http.StatusOK {
 			log.Error("Callback returned status", "status", resp.Status)
 		} else {
-			// log.Info("Callback sent successfully") // Verbose
+			log.Info("Callback sent successfully")
 		}
 	}
 }

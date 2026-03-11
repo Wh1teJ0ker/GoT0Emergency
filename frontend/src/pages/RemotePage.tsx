@@ -5,12 +5,14 @@ import { PageContainer } from '../components/layout/PageContainer';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useToast } from '../components/ui/ToastProvider';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 // @ts-ignore
 import { GetHosts, CreateHost, DeleteHost, DeployNode, SelectFile, ConnectSSH, IsConnected } from '../../wailsjs/go/app/App';
 // @ts-ignore
 import { host } from '../../wailsjs/go/models';
-import { 
-    Trash2, Plus, Server, Key, Zap, MonitorSmartphone, 
+import {
+    Trash2, Plus, Server, Key, Zap, MonitorSmartphone,
     Monitor, Settings, ChevronDown, ChevronRight, CheckCircle, Terminal, Power, PowerOff
 } from 'lucide-react';
 import { SessionView } from '../components/remote/SessionView';
@@ -36,15 +38,20 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
 export function RemotePage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
     const [hosts, setHosts] = useState<host.Host[]>([]);
     const [loading, setLoading] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<Record<number, boolean>>({});
-    const [connectingHosts, setConnectingHosts] = useState<number[]>([]); // Track connecting state
-    
+    const [connectingHosts, setConnectingHosts] = useState<number[]>([]);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
+    const [deployTargetOS, setDeployTargetOS] = useState('linux');
+    const [deployTargetArch, setDeployTargetArch] = useState('amd64');
+
     // Main Page State
     const [activeTab, setActiveTab] = useState<'hosts' | 'batch'>('hosts');
-    // Removed expandedHostId since we use routing now
-    
+
     // Create Host State
     const [isCreating, setIsCreating] = useState(false);
     const [newHost, setNewHost] = useState<any>({
@@ -60,12 +67,10 @@ export function RemotePage() {
     }, []);
 
     const loadHosts = async () => {
-        // Only show full loading if we don't have hosts yet
         if (hosts.length === 0) setLoading(true);
         try {
             const result = await GetHosts();
             setHosts(result || []);
-            // Check connections after loading hosts
             if (result && result.length > 0) {
                 checkConnections(result);
             }
@@ -91,56 +96,65 @@ export function RemotePage() {
 
     const handleConnect = async (hostId: number, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        
+
         setConnectingHosts(prev => [...prev, hostId]);
         try {
             await ConnectSSH(hostId);
             setConnectionStatus(prev => ({ ...prev, [hostId]: true }));
+            toast.success('SSH 连接成功');
         } catch (err) {
             console.error("Connection failed:", err);
-            alert("连接失败: " + err);
+            toast.error('SSH 连接失败', String(err));
             setConnectionStatus(prev => ({ ...prev, [hostId]: false }));
         } finally {
             setConnectingHosts(prev => prev.filter(id => id !== hostId));
         }
     };
 
-    // --- Host Management ---
-    
     const handleCreate = async () => {
         try {
-            if (!newHost.name || !newHost.ip || !newHost.username) return alert("请填写必要信息");
+            if (!newHost.name || !newHost.ip || !newHost.username) {
+                toast.warning('请填写必要信息');
+                return;
+            }
             await CreateHost(newHost);
             setIsCreating(false);
             setNewHost({ name: '', ip: '', port: 22, username: '', password: '', auth_type: 'password', key_path: '' });
             loadHosts();
+            toast.success('主机创建成功');
         } catch (err) {
-            alert("创建失败: " + err);
+            toast.error('主机创建失败', String(err));
         }
     };
 
     const handleDelete = async (hostId: number, e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
-        // Use window.confirm for now as it's reliable
-        if (window.confirm('确定删除此主机?')) {
-            try {
-                await DeleteHost(hostId);
-                // If we are currently viewing this host, go back to list
-                if (id && parseInt(id) === hostId) {
-                    navigate('/remote');
-                }
-                loadHosts();
-            } catch (err) {
-                console.error("Delete failed:", err);
-                alert("删除失败: " + err);
+        setDeleteTargetId(hostId);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTargetId) return;
+        try {
+            await DeleteHost(deleteTargetId);
+            if (id && parseInt(id) === deleteTargetId) {
+                navigate('/remote');
             }
+            loadHosts();
+            toast.success('主机已删除');
+        } catch (err) {
+            console.error("Delete failed:", err);
+            toast.error('主机删除失败', String(err));
+        } finally {
+            setIsDeleteDialogOpen(false);
+            setDeleteTargetId(null);
         }
     };
 
     const startCreate = (type: 'linux' | 'windows') => {
         setNewHost({
-            name: '', ip: '', 
+            name: '', ip: '',
             port: type === 'windows' ? 3389 : 22,
             username: type === 'linux' ? 'root' : 'Administrator',
             password: '', auth_type: 'password', key_path: ''
@@ -153,8 +167,6 @@ export function RemotePage() {
         if (path) setNewHost((prev: any) => ({ ...prev, key_path: path }));
     };
 
-    // --- Batch Operations ---
-
     const toggleHostSelection = (id: number) => {
         setSelectedHosts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
@@ -165,21 +177,25 @@ export function RemotePage() {
     };
 
     const handleBatchDeploy = async () => {
-        if (selectedHosts.length === 0) return alert("请先选择主机");
-        const input = prompt("请输入目标系统 (格式: OS/Arch, 如 linux/amd64):", "linux/amd64");
-        if (!input) return;
-        const [os, arch] = input.split('/');
-        
+        if (selectedHosts.length === 0) {
+            toast.warning('请先选择主机');
+            return;
+        }
+        setIsDeployDialogOpen(true);
+    };
+
+    const confirmBatchDeploy = async () => {
         setBatchProcessing(true);
+        setIsDeployDialogOpen(false);
         try {
-            for (const id of selectedHosts) {
+            for (const hostId of selectedHosts) {
                 try {
-                    await DeployNode(id, os, arch);
+                    await DeployNode(hostId, deployTargetOS, deployTargetArch);
                 } catch (e) {
-                    console.error(`Deploy failed for host ${id}:`, e);
+                    console.error(`Deploy failed for host ${hostId}:`, e);
                 }
             }
-            alert("批量部署完成 (查看日志详情)");
+            toast.success('批量部署完成', '请查看日志详情');
         } finally {
             setBatchProcessing(false);
         }
@@ -189,15 +205,13 @@ export function RemotePage() {
     if (id) {
         const hostId = parseInt(id);
         const currentHost = hosts.find(h => h.id === hostId);
-        
-        // Even if hosts are not loaded yet, we can render the SessionView 
-        // (SessionView fetches its own monitor data, but hostName might be missing initially)
+
         return (
             <div className="h-full bg-background animate-in fade-in duration-200">
-                <SessionView 
-                    hostId={hostId} 
+                <SessionView
+                    hostId={hostId}
                     hostName={currentHost?.name}
-                    onClose={() => navigate('/remote')} 
+                    onClose={() => navigate('/remote')}
                 />
             </div>
         );
@@ -225,6 +239,57 @@ export function RemotePage() {
                 </div>
             </div>
 
+            <ConfirmDialog
+                open={isDeleteDialogOpen}
+                title="确认删除？"
+                content="此操作将永久删除该主机配置。"
+                onConfirm={confirmDelete}
+                onCancel={() => { setIsDeleteDialogOpen(false); setDeleteTargetId(null); }}
+                confirmText="删除"
+                loadingText="删除中..."
+            />
+
+            <ConfirmDialog
+                open={isDeployDialogOpen}
+                title="批量部署 Node"
+                content={
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            已选择 {selectedHosts.length} 台主机，请选择目标系统架构。
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">操作系统</label>
+                                <select
+                                    className="w-full p-2 rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    value={deployTargetOS}
+                                    onChange={(e) => setDeployTargetOS(e.target.value)}
+                                >
+                                    <option value="linux">Linux</option>
+                                    <option value="darwin">macOS</option>
+                                    <option value="windows">Windows</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">架构</label>
+                                <select
+                                    className="w-full p-2 rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    value={deployTargetArch}
+                                    onChange={(e) => setDeployTargetArch(e.target.value)}
+                                >
+                                    <option value="amd64">AMD64 (x86_64)</option>
+                                    <option value="arm64">ARM64</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                }
+                onConfirm={confirmBatchDeploy}
+                onCancel={() => { setIsDeployDialogOpen(false); }}
+                confirmText="开始部署"
+                loadingText="部署中..."
+            />
+
             <div className="flex-1 overflow-y-auto p-1">
                 {activeTab === 'hosts' && (
                     <div className="space-y-4">
@@ -245,8 +310,7 @@ export function RemotePage() {
                                     <div className="divide-y">
                                         {hosts.map(h => (
                                             <div key={h.id} className="group">
-                                                {/* Host Row */}
-                                                <div 
+                                                <div
                                                     className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
                                                     onClick={() => navigate(`/remote/${h.id}`)}
                                                 >
@@ -266,7 +330,7 @@ export function RemotePage() {
                                                                         <CheckCircle size={10} className="mr-1" /> 在线
                                                                     </span>
                                                                 ) : (
-                                                                    <button 
+                                                                    <button
                                                                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                                                                         onClick={(e) => handleConnect(h.id, e)}
                                                                         title="点击连接"
@@ -303,8 +367,8 @@ export function RemotePage() {
                     <div className="space-y-4">
                         <div className="bg-muted/30 p-4 rounded-lg flex items-center justify-between">
                             <label className="flex items-center gap-2 font-medium cursor-pointer">
-                                <input type="checkbox" 
-                                    checked={selectedHosts.length === hosts.length && hosts.length > 0} 
+                                <input type="checkbox"
+                                    checked={selectedHosts.length === hosts.length && hosts.length > 0}
                                     onChange={handleSelectAll}
                                     className="w-4 h-4 rounded border-gray-300"
                                 />
@@ -315,7 +379,7 @@ export function RemotePage() {
                                     <Zap size={16} className="mr-2" />
                                     批量部署 Node
                                 </Button>
-                                <Button size="sm" variant="outline" disabled={batchProcessing || selectedHosts.length === 0} onClick={() => alert("功能开发中")}>
+                                <Button size="sm" variant="outline" disabled={batchProcessing || selectedHosts.length === 0} onClick={() => toast.info('功能开发中')}>
                                     <Terminal size={16} className="mr-2" />
                                     执行命令
                                 </Button>
@@ -337,7 +401,7 @@ export function RemotePage() {
                                     {hosts.map(h => (
                                         <tr key={h.id} className="border-b last:border-0 hover:bg-muted/20">
                                             <td className="p-3 text-center">
-                                                <input type="checkbox" 
+                                                <input type="checkbox"
                                                     checked={selectedHosts.includes(h.id)}
                                                     onChange={() => toggleHostSelection(h.id)}
                                                     className="w-4 h-4 rounded border-gray-300"
@@ -368,64 +432,64 @@ export function RemotePage() {
             </div>
 
             {/* Create Host Modal */}
-            <Modal 
-                open={isCreating} 
-                onClose={() => setIsCreating(false)} 
+            <Modal
+                open={isCreating}
+                onClose={() => setIsCreating(false)}
                 title="添加主机"
             >
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <label className="text-sm font-medium">主机名称</label>
-                        <Input 
-                            value={newHost.name} 
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({...newHost, name: e.target.value})} 
+                        <Input
+                            value={newHost.name}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({ ...newHost, name: e.target.value })}
                             placeholder="My Server"
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-sm font-medium">IP 地址</label>
-                            <Input 
-                                value={newHost.ip} 
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({...newHost, ip: e.target.value})} 
+                            <Input
+                                value={newHost.ip}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({ ...newHost, ip: e.target.value })}
                                 placeholder="192.168.1.1"
                             />
                         </div>
                         <div className="space-y-1">
                             <label className="text-sm font-medium">端口</label>
-                            <Input 
+                            <Input
                                 type="number"
-                                value={newHost.port} 
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({...newHost, port: parseInt(e.target.value)})} 
+                                value={newHost.port}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({ ...newHost, port: parseInt(e.target.value) })}
                             />
                         </div>
                     </div>
                     <div className="space-y-1">
                         <label className="text-sm font-medium">用户名</label>
-                        <Input 
-                            value={newHost.username} 
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({...newHost, username: e.target.value})} 
+                        <Input
+                            value={newHost.username}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({ ...newHost, username: e.target.value })}
                         />
                     </div>
-                    
+
                     <div className="space-y-2">
                         <label className="text-sm font-medium">认证方式</label>
                         <div className="flex gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input 
-                                    type="radio" 
+                                <input
+                                    type="radio"
                                     name="auth_type"
                                     checked={newHost.auth_type === 'password'}
-                                    onChange={() => setNewHost({...newHost, auth_type: 'password'})}
+                                    onChange={() => setNewHost({ ...newHost, auth_type: 'password' })}
                                 />
                                 <span>密码</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input 
-                                    type="radio" 
+                                <input
+                                    type="radio"
                                     name="auth_type"
                                     checked={newHost.auth_type === 'key'}
-                                    onChange={() => setNewHost({...newHost, auth_type: 'key'})}
+                                    onChange={() => setNewHost({ ...newHost, auth_type: 'key' })}
                                 />
                                 <span>密钥</span>
                             </label>
@@ -435,20 +499,20 @@ export function RemotePage() {
                     {newHost.auth_type === 'password' ? (
                         <div className="space-y-1">
                             <label className="text-sm font-medium">密码</label>
-                            <Input 
+                            <Input
                                 type="password"
-                                value={newHost.password} 
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({...newHost, password: e.target.value})} 
+                                value={newHost.password}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHost({ ...newHost, password: e.target.value })}
                             />
                         </div>
                     ) : (
                         <div className="space-y-1">
                             <label className="text-sm font-medium">密钥路径</label>
                             <div className="flex gap-2">
-                                <Input 
-                                    value={newHost.key_path} 
-                                    readOnly 
-                                    placeholder="请选择密钥文件" 
+                                <Input
+                                    value={newHost.key_path}
+                                    readOnly
+                                    placeholder="请选择密钥文件"
                                 />
                                 <Button onClick={handleSelectKey} variant="outline">选择</Button>
                             </div>

@@ -5,6 +5,7 @@ import { Card, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { useToast } from "../components/ui/ToastProvider";
 import { RefreshCw, Trash2, Calendar, Search, Filter } from "lucide-react";
 // @ts-ignore
 import { GetLogsByDate, GetLogFiles, ClearLogs } from "../../wailsjs/go/app/App";
@@ -27,6 +28,7 @@ const MODULES = [
 ];
 
 export function LogsPage() {
+    const toast = useToast();
     const [rawLogs, setRawLogs] = useState<string[]>([]);
     const [dates, setDates] = useState<string[]>([]);
     const [selectedDate, setSelectedDate] = useState<string>('');
@@ -85,9 +87,10 @@ export function LogsPage() {
         try {
             await ClearLogs();
             loadLogs(selectedDate); // Reload current
+            toast.success('日志已清空');
         } catch (err) {
             console.error("Failed to clear logs:", err);
-            alert("清空日志失败: " + err);
+            toast.error('日志清空失败', String(err));
         }
     };
 

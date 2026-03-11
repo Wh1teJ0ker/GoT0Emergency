@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastProvider } from './components/ui/ToastProvider';
 import { MainLayout } from './components/layout/MainLayout';
 import { SettingsPage } from './pages/SettingsPage';
 import { PageContainer } from './components/layout/PageContainer';
@@ -22,23 +23,25 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 
 function App() {
     return (
-        <HashRouter basename="/">
-            <Routes>
-                <Route path="/" element={<MainLayout />}>
-                    <Route index element={<Navigate to="/local" replace />} />
-                    <Route path="local" element={<LocalPage />} />
-                    <Route path="remote" element={<RemotePage />} />
-                    <Route path="remote/:id" element={<RemotePage />} />
-                    <Route path="node/plugins" element={<PluginManager />} />
-                    <Route path="node/manager" element={<NodeManager />} />
-                    <Route path="logs" element={<LogsPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    
-                    {/* Fallback to local */}
-                    <Route path="*" element={<Navigate to="/local" replace />} />
-                </Route>
-            </Routes>
-        </HashRouter>
+        <ToastProvider>
+            <HashRouter basename="/">
+                <Routes>
+                    <Route path="/" element={<MainLayout />}>
+                        <Route index element={<Navigate to="/local" replace />} />
+                        <Route path="local" element={<LocalPage />} />
+                        <Route path="remote" element={<RemotePage />} />
+                        <Route path="remote/:id" element={<RemotePage />} />
+                        <Route path="node/plugins" element={<PluginManager />} />
+                        <Route path="node/manager" element={<NodeManager />} />
+                        <Route path="logs" element={<LogsPage />} />
+                        <Route path="settings" element={<SettingsPage />} />
+
+                        {/* Fallback to local */}
+                        <Route path="*" element={<Navigate to="/local" replace />} />
+                    </Route>
+                </Routes>
+            </HashRouter>
+        </ToastProvider>
     );
 }
 
