@@ -544,3 +544,9 @@ func (a *App) TerminalClose(id string) error {
 	a.terminalManager.Remove(id)
 	return nil
 }
+
+// OpenURL opens the given URL in the system default browser
+func (a *App) OpenURL(url string) error {
+	runtime.BrowserOpenURL(a.ctx, url)
+	return nil
+}

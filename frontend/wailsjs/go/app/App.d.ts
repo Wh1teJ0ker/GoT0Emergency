@@ -59,6 +59,8 @@ export function LaunchRDP(arg1:number,arg2:number,arg3:number):Promise<void>;
 
 export function ListRemoteFiles(arg1:number,arg2:string):Promise<Array<session.FileInfo>>;
 
+export function OpenURL(arg1:string):Promise<void>;
+
 export function RDPOpen(arg1:number):Promise<void>;
 
 export function RemoveRemoteFile(arg1:number,arg2:string):Promise<void>;

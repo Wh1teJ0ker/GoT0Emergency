@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
 import { useState, useEffect } from 'react';
 // @ts-ignore
-import { GetHosts } from '../../../wailsjs/go/app/App';
+import { GetHosts, OpenURL } from '../../../wailsjs/go/app/App';
 // @ts-ignore
 import { host } from '../../../wailsjs/go/models';
 
@@ -188,17 +188,15 @@ export function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-border space-y-4">
-                <a
-                    href="https://github.com/Wh1teJ0ker/GoT0Emergency"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
+                <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    size="sm"
+                    onClick={() => OpenURL('https://github.com/Wh1teJ0ker/GoT0Emergency')}
                 >
-                    <Button variant="outline" className="w-full justify-start gap-2" size="sm">
-                        <Github size={16} />
-                        <span>GitHub</span>
-                    </Button>
-                </a>
+                    <Github size={16} />
+                    <span>GitHub</span>
+                </Button>
                 <div className="bg-muted/50 rounded-md p-3">
                     <p className="text-xs text-muted-foreground font-mono">v1.0.0</p>
                 </div>

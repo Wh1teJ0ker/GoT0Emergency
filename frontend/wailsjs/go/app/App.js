@@ -110,6 +110,10 @@ export function ListRemoteFiles(arg1, arg2) {
   return window['go']['app']['App']['ListRemoteFiles'](arg1, arg2);
 }
 
+export function OpenURL(arg1) {
+  return window['go']['app']['App']['OpenURL'](arg1);
+}
+
 export function RDPOpen(arg1) {
   return window['go']['app']['App']['RDPOpen'](arg1);
 }
