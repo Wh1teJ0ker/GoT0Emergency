@@ -201,29 +201,18 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 
 	client, err := sm.getClientUnlocked(hostID)
 	if err != nil {
-		log.Error("Failed to get SSH client for port forwarding", "host_id", hostID, "error", err)
 		return err
 	}
 
 	// Listen on remote port
-	// Try binding to 127.0.0.1 first (works without GatewayPorts)
-	// If node runs on same host, it can still connect to 127.0.0.1
-	remoteAddr := log.Sprintf("127.0.0.1:%d", remotePort)
-	log.Info("Attempting to listen on remote address", "address", remoteAddr)
-	listener, err := client.Listen("tcp", remoteAddr)
+	// 0.0.0.0 to listen on all interfaces on the remote host
+	listener, err := client.Listen("tcp", log.Sprintf("0.0.0.0:%d", remotePort))
 	if err != nil {
-		// Try fallback to 0.0.0.0 (requires GatewayPorts yes)
-		log.Error("Failed to bind to 127.0.0.1, trying 0.0.0.0 (requires GatewayPorts)", "error", err)
-		remoteAddr = log.Sprintf("0.0.0.0:%d", remotePort)
-		listener, err = client.Listen("tcp", remoteAddr)
-		if err != nil {
-			log.Error("Failed to listen on remote port", "address", remoteAddr, "error", err)
-			return log.Errorf("failed to listen on remote port %d: %w", remotePort, err)
-		}
+		return log.Errorf("failed to listen on remote port %d: %w", remotePort, err)
 	}
 
 	sm.remoteListeners[hostID] = listener
-	log.Info("Started remote port forwarding", "host_id", hostID, "remote_addr", remoteAddr, "local_port", localPort)
+	log.Info("Started remote port forwarding", "host_id", hostID, "remote_port", remotePort, "local_port", localPort)
 
 	go func() {
 		defer func() {
@@ -231,26 +220,22 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 			listener.Close()
 			delete(sm.remoteListeners, hostID)
 			sm.mu.Unlock()
-			log.Info("Stopped remote port forwarding", "host_id", hostID)
+			log.Info("Stopped remote port forwarding due to accept error", "host_id", hostID)
 		}()
 
 		for {
 			remoteConn, err := listener.Accept()
 			if err != nil {
 				// This error is expected when the listener is closed, so we just exit the loop.
-				log.Debug("Listener accept error, stopping forwarder", "host_id", hostID, "error", err)
 				return
 			}
 
-			log.Info("Accepted remote connection, dialing local port", "remote_addr", remoteConn.RemoteAddr(), "local_port", localPort)
 			localConn, err := net.Dial("tcp", log.Sprintf("localhost:%d", localPort))
 			if err != nil {
 				log.Error("Failed to dial local port for forwarding", "err", err)
 				remoteConn.Close()
 				continue
 			}
-
-			log.Info("Port forwarding established", "remote", remoteConn.RemoteAddr(), "local", localConn.LocalAddr())
 
 			// Bidirectional copy
 			go func() {

@@ -81,6 +81,23 @@ export function RemotePage() {
         }
     };
 
+    // Refresh connection status when returning to this page
+    useEffect(() => {
+        const refreshConnections = async () => {
+            if (hosts.length > 0) {
+                await checkConnections(hosts);
+            }
+        };
+
+        // Listen for window focus event to refresh connections
+        const handleFocus = () => refreshConnections();
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [hosts]);
+
     const checkConnections = async (hostList: host.Host[]) => {
         const statuses: Record<number, boolean> = {};
         for (const h of hostList) {
@@ -209,6 +226,7 @@ export function RemotePage() {
         return (
             <div className="h-full bg-background animate-in fade-in duration-200">
                 <SessionView
+                    key={id}
                     hostId={hostId}
                     hostName={currentHost?.name}
                     onClose={() => navigate('/remote')}
