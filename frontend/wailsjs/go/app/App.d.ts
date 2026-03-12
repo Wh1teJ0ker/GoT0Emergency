@@ -31,6 +31,8 @@ export function GetBuiltNodes():Promise<Array<string>>;
 
 export function GetDBPath():Promise<string>;
 
+export function GetHost(arg1:number):Promise<host.Host>;
+
 export function GetHostMetrics(arg1:number,arg2:string):Promise<Array<monitor.MetricPoint>>;
 
 export function GetHosts():Promise<Array<host.Host>>;
@@ -78,5 +80,7 @@ export function TerminalOpen(arg1:number,arg2:number,arg3:number):Promise<string
 export function TerminalResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
+
+export function UpdateHost(arg1:host.Host):Promise<void>;
 
 export function UploadFile(arg1:number,arg2:string,arg3:string,arg4:boolean):Promise<void>;

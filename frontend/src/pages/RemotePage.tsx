@@ -8,12 +8,12 @@ import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/ToastProvider';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 // @ts-ignore
-import { GetHosts, CreateHost, DeleteHost, DeployNode, SelectFile, ConnectSSH, IsConnected } from '../../wailsjs/go/app/App';
+import { GetHosts, CreateHost, DeleteHost, DeployNode, SelectFile, ConnectSSH, IsConnected, GetHost, UpdateHost } from '../../wailsjs/go/app/App';
 // @ts-ignore
 import { host } from '../../wailsjs/go/models';
 import {
     Trash2, Plus, Server, Key, Zap, MonitorSmartphone,
-    Monitor, Settings, ChevronDown, ChevronRight, CheckCircle, Terminal, Power, PowerOff
+    Monitor, Settings, ChevronDown, ChevronRight, CheckCircle, Terminal, Power, PowerOff, Edit2
 } from 'lucide-react';
 import { SessionView } from '../components/remote/SessionView';
 import { Loading } from '../components/ui/Loading';
@@ -57,6 +57,10 @@ export function RemotePage() {
     const [newHost, setNewHost] = useState<any>({
         name: '', ip: '', port: 22, username: '', password: '', auth_type: 'password', key_path: ''
     });
+
+    // Edit Host State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingHost, setEditingHost] = useState<host.Host | null>(null);
 
     // Batch Ops State
     const [selectedHosts, setSelectedHosts] = useState<number[]>([]);
@@ -182,6 +186,39 @@ export function RemotePage() {
     const handleSelectKey = async () => {
         const path = await SelectFile();
         if (path) setNewHost((prev: any) => ({ ...prev, key_path: path }));
+    };
+
+    const handleEdit = async (hostId: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            const h = await GetHost(hostId);
+            setEditingHost(h);
+            setIsEditing(true);
+        } catch (err) {
+            console.error("Failed to load host details:", err);
+            toast.error('加载主机信息失败', String(err));
+        }
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingHost) return;
+        try {
+            await UpdateHost(editingHost);
+            setIsEditing(false);
+            setEditingHost(null);
+            loadHosts();
+            toast.success('主机信息已更新');
+        } catch (err) {
+            console.error("Failed to update host:", err);
+            toast.error('更新主机失败', String(err));
+        }
+    };
+
+    const handleSelectKeyEdit = async () => {
+        const path = await SelectFile();
+        if (path && editingHost) {
+            setEditingHost({ ...editingHost, key_path: path });
+        }
     };
 
     const toggleHostSelection = (id: number) => {
@@ -364,6 +401,9 @@ export function RemotePage() {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
+                                                        <Button variant="ghost" size="icon" onClick={(e) => handleEdit(h.id, e)} className="text-muted-foreground hover:text-foreground z-10 relative">
+                                                            <Edit2 size={16} />
+                                                        </Button>
                                                         <Button variant="ghost" size="icon" onClick={(e) => handleDelete(h.id, e)} className="text-muted-foreground hover:text-destructive z-10 relative">
                                                             <Trash2 size={16} />
                                                         </Button>
@@ -542,6 +582,103 @@ export function RemotePage() {
                         <Button onClick={handleCreate}>添加</Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Edit Host Modal */}
+            <Modal
+                open={isEditing}
+                onClose={() => { setIsEditing(false); setEditingHost(null); }}
+                title="编辑主机"
+            >
+                {editingHost && (
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium">主机名称</label>
+                            <Input
+                                value={editingHost.name}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingHost({ ...editingHost, name: e.target.value })}
+                                placeholder="My Server"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">IP 地址</label>
+                                <Input
+                                    value={editingHost.ip}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingHost({ ...editingHost, ip: e.target.value })}
+                                    placeholder="192.168.1.1"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">端口</label>
+                                <Input
+                                    type="number"
+                                    value={editingHost.port}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingHost({ ...editingHost, port: parseInt(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium">用户名</label>
+                            <Input
+                                value={editingHost.username}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingHost({ ...editingHost, username: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">认证方式</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="auth_type"
+                                        checked={editingHost.auth_type === 'password'}
+                                        onChange={() => setEditingHost({ ...editingHost, auth_type: 'password' })}
+                                    />
+                                    <span>密码</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="auth_type"
+                                        checked={editingHost.auth_type === 'key'}
+                                        onChange={() => setEditingHost({ ...editingHost, auth_type: 'key' })}
+                                    />
+                                    <span>密钥</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {editingHost.auth_type === 'password' ? (
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">密码</label>
+                                <Input
+                                    type="password"
+                                    value={editingHost.password}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingHost({ ...editingHost, password: e.target.value })}
+                                />
+                            </div>
+                        ) : (
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">密钥路径</label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={editingHost.key_path}
+                                        readOnly
+                                        placeholder="请选择密钥文件"
+                                    />
+                                    <Button onClick={handleSelectKeyEdit} variant="outline">选择</Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => { setIsEditing(false); setEditingHost(null); }}>取消</Button>
+                            <Button onClick={handleSaveEdit}>保存</Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </PageContainer>
 

@@ -103,3 +103,16 @@ func (s *Service) DeleteHost(id int64) error {
 	_, err := db.DB.Exec("DELETE FROM hosts WHERE id = ?", id)
 	return err
 }
+
+func (s *Service) UpdateHost(h *Host) error {
+	query := `
+		UPDATE hosts
+		SET name = ?, ip = ?, port = ?, username = ?, auth_type = ?, password = ?, key_path = ?
+		WHERE id = ?
+	`
+	_, err := db.DB.Exec(query, h.Name, h.IP, h.Port, h.Username, h.AuthType, h.Password, h.KeyPath, h.ID)
+	if err != nil {
+		return log.Errorf("failed to update host: %w", err)
+	}
+	return nil
+}

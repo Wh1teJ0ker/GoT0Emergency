@@ -186,12 +186,20 @@ func (a *App) GetHosts() ([]host.Host, error) {
 	return a.hostService.GetHosts()
 }
 
+func (a *App) GetHost(id int64) (*host.Host, error) {
+	return a.hostService.GetHost(id)
+}
+
 func (a *App) CreateHost(h host.Host) error {
 	return a.hostService.CreateHost(&h)
 }
 
 func (a *App) DeleteHost(id int64) error {
 	return a.hostService.DeleteHost(id)
+}
+
+func (a *App) UpdateHost(h host.Host) error {
+	return a.hostService.UpdateHost(&h)
 }
 
 // SSH Methods
@@ -491,21 +499,27 @@ func (a *App) TerminalOpen(hostID int64, rows, cols int) (string, error) {
 	var term terminal.Terminal
 	var err error
 
+	log.Info("Opening terminal", "host_id", hostID, "terminal_id", id)
+
 	if hostID == 0 {
 		term, err = local.NewLocalTerminal(a.ctx, id)
 	} else {
+		log.Info("Getting SSH client for terminal", "host_id", hostID)
 		client, err := a.sessionManager.GetClient(hostID)
 		if err != nil {
+			log.Error("Failed to get SSH client", "host_id", hostID, "error", err)
 			return "", err
 		}
 		term, err = ssh.NewSSHTerminal(a.ctx, client, id, rows, cols)
 	}
 
 	if err != nil {
+		log.Error("Failed to create terminal", "host_id", hostID, "error", err)
 		return "", err
 	}
 
 	a.terminalManager.Add(id, term)
+	log.Info("Terminal created successfully", "terminal_id", id, "host_id", hostID)
 	return id, nil
 }
 

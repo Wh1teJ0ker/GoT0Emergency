@@ -145,12 +145,14 @@ func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 	sm.mu.RUnlock()
 
 	if ok {
+		log.Info("Host already connected, returning existing connection", "host_id", hostID)
 		return client, nil
 	}
 
 	// Auto-connect if not connected
 	log.Info("Host not connected, attempting auto-connect", "host_id", hostID)
 	if err := sm.Connect(hostID); err != nil {
+		log.Error("Auto-connect failed", "host_id", hostID, "error", err)
 		return nil, err
 	}
 

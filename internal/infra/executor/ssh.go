@@ -55,8 +55,32 @@ func ConnectSSH(ip string, port int, user string, authMethods []ssh.AuthMethod) 
 			ssh.KeyAlgoECDSA521,
 			ssh.KeyAlgoED25519,
 		},
+		// Keepalive configuration to maintain stable connections
+		ClientVersion: "SSH-2.0-GoT0Emergency",
 	}
 
 	addr := log.Sprintf("%s:%d", ip, port)
-	return ssh.Dial("tcp", addr, config)
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start keepalive goroutine
+	go keepAlive(client, ip, port)
+
+	return client, nil
+}
+
+// keepAlive sends keepalive packets every 30 seconds to maintain the connection
+func keepAlive(client *ssh.Client, ip string, port int) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		_, _, err := client.SendRequest("keepalive@got0emergency", true, nil)
+		if err != nil {
+			log.Debug("Keepalive failed, connection may be lost", "ip", ip, "port", port, "error", err)
+			return
+		}
+	}
 }

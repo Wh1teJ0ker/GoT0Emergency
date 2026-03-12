@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { 
-    Activity, Cpu, HardDrive, Network, Zap, Server, 
+import {
+    Activity, Cpu, HardDrive, Network, Zap, Server,
     Monitor, Clock, Disc, Layers, List, Box, Info, RotateCw
 } from 'lucide-react';
-import { 
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 // @ts-ignore
 import { CheckHostStatus, GetHostMetrics } from '../../../wailsjs/go/app/App';
@@ -26,6 +26,7 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('overview');
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         loadStatus();
@@ -37,7 +38,7 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
             if (showHistory) {
                 loadHistory();
             }
-        }, 60000); 
+        }, 60000);
         return () => clearInterval(interval);
     }, [hostId, showHistory]);
 
@@ -47,9 +48,15 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
             const result = await CheckHostStatus(hostId);
             setStatus(result);
             setError(null);
+            setIsConnected(true);
         } catch (err) {
             console.error("Failed to check host status:", err);
-            setError(String(err));
+            const errorMsg = String(err);
+            setError(errorMsg);
+            // Check if it's a connection error
+            if (errorMsg.includes('host not connected')) {
+                setIsConnected(false);
+            }
         } finally {
             setLoading(false);
         }
@@ -81,6 +88,18 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
 
     if (loading && !status) {
         return <Loading text="Loading monitor data..." className="py-20" />;
+    }
+
+    // Show not connected state
+    if (!isConnected && !status) {
+        return (
+            <div className="p-8 text-center">
+                <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Server size={48} className="mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">主机未连接</h3>
+                </div>
+            </div>
+        );
     }
 
     if (error && !status) {
@@ -142,9 +161,9 @@ export function FullHostMonitor({ hostId, showHistory = true }: FullHostMonitorP
                         <div className="text-muted-foreground">当前用户</div>
                         <div className="font-medium">{status.system?.current_user || '-'}</div>
                     </div>
-                    <Button 
-                        variant="outline" 
-                        size="icon" 
+                    <Button
+                        variant="outline"
+                        size="icon"
                         onClick={() => { loadStatus(); if (showHistory) loadHistory(); }}
                         disabled={loading}
                         title="刷新数据"

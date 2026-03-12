@@ -54,6 +54,10 @@ export function GetDBPath() {
   return window['go']['app']['App']['GetDBPath']();
 }
 
+export function GetHost(arg1) {
+  return window['go']['app']['App']['GetHost'](arg1);
+}
+
 export function GetHostMetrics(arg1, arg2) {
   return window['go']['app']['App']['GetHostMetrics'](arg1, arg2);
 }
@@ -148,6 +152,10 @@ export function TerminalResize(arg1, arg2, arg3) {
 
 export function TerminalWrite(arg1, arg2) {
   return window['go']['app']['App']['TerminalWrite'](arg1, arg2);
+}
+
+export function UpdateHost(arg1) {
+  return window['go']['app']['App']['UpdateHost'](arg1);
 }
 
 export function UploadFile(arg1, arg2, arg3, arg4) {

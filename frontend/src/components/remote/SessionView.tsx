@@ -1,10 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { XtermTerminal } from '../terminal/XtermTerminal';
 import { FileManager } from './FileManager';
 import { FullHostMonitor } from '../monitor/FullHostMonitor';
 import { Button } from '../ui/Button';
-import { Terminal, Folder, Activity, ArrowLeft, Plus, X } from 'lucide-react';
+import { Terminal, Folder, Activity, ArrowLeft, Plus, X, Zap, CheckCircle, PowerOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
+// @ts-ignore
+import { ConnectSSH, IsConnected } from '../../../wailsjs/go/app/App';
+import { useToast } from '../ui/ToastProvider';
 
 interface TerminalTab {
     id: string;
@@ -20,10 +23,47 @@ interface SessionViewProps {
 }
 
 export function SessionView({ hostId, hostName, initialTab = 'monitor', onClose }: SessionViewProps) {
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState<'monitor' | 'terminal' | 'files'>(initialTab);
     const [terminals, setTerminals] = useState<TerminalTab[]>([]);
     const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
     const terminalCounter = useRef(0);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
+
+    // Auto-connect when entering the session view
+    useEffect(() => {
+        const checkAndConnect = async () => {
+            try {
+                const connected = await IsConnected(hostId);
+                if (connected) {
+                    setIsConnected(true);
+                    return;
+                }
+
+                // Not connected, try to connect
+                setIsConnecting(true);
+                await ConnectSSH(hostId);
+                setIsConnected(true);
+                toast.success('SSH 连接成功');
+            } catch (err) {
+                console.error("Connection failed:", err);
+                toast.error('SSH 连接失败', String(err));
+                setIsConnected(false);
+            } finally {
+                setIsConnecting(false);
+            }
+        };
+
+        checkAndConnect();
+    }, [hostId]);
+
+    // Reset terminals when hostId changes
+    useEffect(() => {
+        setTerminals([]);
+        setActiveTerminalId(null);
+        terminalCounter.current = 0;
+    }, [hostId]);
 
     const addTerminal = () => {
         terminalCounter.current += 1;
@@ -83,9 +123,39 @@ export function SessionView({ hostId, hostName, initialTab = 'monitor', onClose 
                     </Button>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium mr-4">
+                    <span className="text-sm font-medium mr-2">
                         {hostName || `Host #${hostId}`}
                     </span>
+                    {isConnecting ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <Zap size={10} className="mr-1 animate-pulse" /> 连接中...
+                        </span>
+                    ) : isConnected ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle size={10} className="mr-1" /> 在线
+                        </span>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                setIsConnecting(true);
+                                try {
+                                    await ConnectSSH(hostId);
+                                    setIsConnected(true);
+                                    toast.success('SSH 连接成功');
+                                } catch (err) {
+                                    toast.error('SSH 连接失败', String(err));
+                                    setIsConnected(false);
+                                } finally {
+                                    setIsConnecting(false);
+                                }
+                            }}
+                            className="gap-1 h-7 text-xs"
+                        >
+                            <PowerOff size={12} /> 点击连接
+                        </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={onClose} className="gap-2">
                         <ArrowLeft size={14} />
                         返回列表
