@@ -188,10 +188,17 @@ export function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-border space-y-4">
-                <Button variant="outline" className="w-full justify-start gap-2" size="sm">
-                    <Github size={16} />
-                    <span>GitHub</span>
-                </Button>
+                <a
+                    href="https://github.com/Wh1teJ0ker/GoT0Emergency"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                >
+                    <Button variant="outline" className="w-full justify-start gap-2" size="sm">
+                        <Github size={16} />
+                        <span>GitHub</span>
+                    </Button>
+                </a>
                 <div className="bg-muted/50 rounded-md p-3">
                     <p className="text-xs text-muted-foreground font-mono">v1.0.0</p>
                 </div>
