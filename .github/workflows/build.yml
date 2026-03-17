@@ -1,23 +1,4 @@
-# GoT0Emergency 自动构建和发布工作流
-#
-# 功能：
-# - 支持多平台自动构建（Windows/Linux/macOS）
-# - 打 tag (v*) 时自动创建 GitHub Release
-# - 手动触发构建（workflow_dispatch）
-# - 缓存依赖以加速构建
-#
-# 触发条件：
-# - push 到 main/master 分支
-# - 创建 v* 格式的 tag（如 v1.0.0）
-# - 手动在 Actions 页面点击运行
-#
-# 输出平台：
-# - Windows AMD64: JAttack-windows-amd64.exe
-# - Linux AMD64: JAttack-linux-amd64
-# - macOS Universal: JAttack-macos-universal.zip
-
 name: Wails Build
-
 permissions:
   contents: write
 
