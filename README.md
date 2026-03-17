@@ -1,98 +1,19 @@
-# GoT0Emergency
+# README
 
-🚀 基于 Wails 的竞赛/应急响应桌面应用
+## About
 
-***
+This is the official Wails React-TS template.
 
-## 功能特性
+You can configure the project by editing `wails.json`. More information about the project settings can be found
+here: https://wails.io/docs/reference/project-config
 
-- 🖥️ **远程主机管理** - SSH 连接、多标签终端、文件传输
-- 📊 **实时监控** - CPU/内存/磁盘/网络指标监控
-- 🔌 **Node 代理** - 跨平台代理部署，自动数据回传
-- 🌐 **多主机并发** - 同时管理多台远程主机
+## Live Development
 
-***
+To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
+server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
+and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
+to this in your browser, and you can call your Go code from devtools.
 
-## 快速开始
+## Building
 
-### 下载安装
-
-1. 从 [Releases](https://github.com/Wh1teJ0ker/GoT0Emergency/releases) 下载
-2. 解压后运行 `GoT0Emergency.exe`
-
-### 源码编译
-
-```bash
-git clone https://github.com/Wh1teJ0ker/GoT0Emergency.git
-cd GoT0Emergency
-wails build
-```
-
-输出：`build/bin/GoT0Emergency.exe`
-
-***
-
-## 使用指南
-
-### 添加主机
-
-1. 进入「远程管理」→ 点击「添加主机」
-2. 填写：名称、IP、端口、用户名、密码/密钥
-
-### 连接主机
-
-- 点击主机卡片进入详情
-- 自动尝试连接，绿色「在线」= 已连接
-
-### 终端多开
-
-- 点击「终端」标签
-- 点「+」新增终端标签页
-
-### 文件传输
-
-- 切换到「文件管理」
-- 左侧本地，右侧远程，支持上传/下载/删除
-
-### Node 部署
-
-1. 点击「Node 部署」标签
-2. 选择平台 → 「构建并部署」
-
-***
-
-## 技术栈
-
-| <br /> | <br />                  |
-| ------ | ----------------------- |
-| 框架     | Wails v2                |
-| 后端     | Go 1.23                 |
-| 前端     | React + TypeScript      |
-| 数据库    | SQLite3 (WAL)           |
-| SSH    | golang.org/x/crypto/ssh |
-
-***
-
-## 配置说明
-
-**设置页面支持：**
-
-- 数据库路径自定义
-- 数据保留时间（小时）
-- 日志查看/清理
-
-***
-
-## 开发
-
-```bash
-# 实时开发模式
-wails dev
-
-# 生产构建
-wails build
-```
-
-***
-
-<p align="center">⭐ 如果觉得有用，请给一个 Star！</p>
+To build a redistributable, production mode package, use `wails build`.
