@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 	stdRuntime "runtime"
 	"strings"
 	"time"
@@ -157,6 +158,31 @@ func (a *App) InitDB() error {
 
 func (a *App) GetDBPath() string {
 	return path.GetDBPath()
+}
+
+func (a *App) SetDBPath(dbPath string) error {
+	return path.SetDBPath(dbPath)
+}
+
+func (a *App) SelectDBPath(defaultPath string) (string, error) {
+	// Extract directory from current path for default location
+	defaultDir := ""
+	if defaultPath != "" {
+		defaultDir = filepath.Dir(defaultPath)
+	}
+
+	selection, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:            "选择数据库保存位置",
+		DefaultFilename:  "app.db",
+		DefaultDirectory: defaultDir,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "SQLite Database (*.db)",
+				Pattern:     "*.db",
+			},
+		},
+	})
+	return selection, err
 }
 
 // Log Methods

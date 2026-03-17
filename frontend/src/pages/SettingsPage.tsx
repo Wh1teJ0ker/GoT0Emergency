@@ -3,15 +3,16 @@ import { PageContainer } from "../components/layout/PageContainer";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Database, RefreshCw } from "lucide-react";
+import { Database, RefreshCw, Folder, Check } from "lucide-react";
 import { useToast } from "../components/ui/ToastProvider";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 // @ts-ignore
-import { InitDB, GetDBPath, GetRetentionHours, SetRetentionHours } from "../../wailsjs/go/app/App";
+import { InitDB, GetDBPath, GetRetentionHours, SetRetentionHours, SetDBPath, SelectDBPath } from "../../wailsjs/go/app/App";
 
 export function SettingsPage() {
     const toast = useToast();
     const [dbPath, setDbPath] = useState("");
+    const [inputPath, setInputPath] = useState("");
     const [retentionHours, setRetentionHours] = useState(24);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -48,8 +49,43 @@ export function SettingsPage() {
         try {
             const path = await GetDBPath();
             setDbPath(path);
+            setInputPath(path);
         } catch (err) {
             console.error("Failed to load DB path:", err);
+        }
+    };
+
+    const handleSelectDBPath = async () => {
+        try {
+            // Pass current path as default location
+            const selected = await SelectDBPath(dbPath);
+            if (selected) {
+                await SetDBPath(selected);
+                setDbPath(selected);
+                setInputPath(selected);
+                toast.success('数据库路径已更新');
+            }
+        } catch (err) {
+            console.error("Failed to select DB path:", err);
+            toast.error('选择数据库路径失败', String(err));
+        }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInputPath(e.target.value);
+    };
+
+    const handleApplyPath = async () => {
+        if (!inputPath || inputPath === dbPath) {
+            return;
+        }
+        try {
+            await SetDBPath(inputPath);
+            setDbPath(inputPath);
+            toast.success('数据库路径已更新');
+        } catch (err) {
+            console.error("Failed to set DB path:", err);
+            toast.error('设置数据库路径失败', String(err));
         }
     };
 
@@ -121,9 +157,34 @@ export function SettingsPage() {
                     <CardContent className="space-y-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-medium">数据库路径</label>
-                            <div className="p-2 bg-secondary rounded text-sm font-mono break-all">
-                                {dbPath || "加载中..."}
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={inputPath}
+                                    onChange={handleInputChange}
+                                    className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                                    placeholder="输入数据库路径..."
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleSelectDBPath}
+                                    title="选择数据库路径"
+                                >
+                                    <Folder size={16} />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleApplyPath}
+                                    disabled={!inputPath || inputPath === dbPath}
+                                    title="应用路径"
+                                >
+                                    <Check size={16} />
+                                </Button>
                             </div>
+                            <p className="text-xs text-muted-foreground">
+                                当前路径：{dbPath || "加载中..."}
+                            </p>
                         </div>
 
                         <div className="pt-4 border-t">

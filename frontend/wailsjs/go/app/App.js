@@ -130,12 +130,20 @@ export function SavePluginSource(arg1, arg2) {
   return window['go']['app']['App']['SavePluginSource'](arg1, arg2);
 }
 
+export function SelectDBPath(arg1) {
+  return window['go']['app']['App']['SelectDBPath'](arg1);
+}
+
 export function SelectFile() {
   return window['go']['app']['App']['SelectFile']();
 }
 
 export function SelectSaveFile() {
   return window['go']['app']['App']['SelectSaveFile']();
+}
+
+export function SetDBPath(arg1) {
+  return window['go']['app']['App']['SetDBPath'](arg1);
 }
 
 export function SetRetentionHours(arg1) {

@@ -69,9 +69,13 @@ export function RunNode(arg1:number):Promise<string>;
 
 export function SavePluginSource(arg1:string,arg2:string):Promise<void>;
 
+export function SelectDBPath(arg1:string):Promise<string>;
+
 export function SelectFile():Promise<string>;
 
 export function SelectSaveFile():Promise<string>;
+
+export function SetDBPath(arg1:string):Promise<void>;
 
 export function SetRetentionHours(arg1:number):Promise<void>;
 

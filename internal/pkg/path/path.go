@@ -3,16 +3,19 @@ package path
 import (
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 var (
-	rootDir string
-	dataDir string
-	dbDir   string
-	logDir  string
-	sshDir  string
-	tmpDir  string
-	nodeDir string
+	rootDir   string
+	dataDir   string
+	dbDir     string
+	dbPath    string
+	logDir    string
+	sshDir    string
+	tmpDir    string
+	nodeDir   string
+	pathMutex sync.RWMutex
 )
 
 func Init() error {
@@ -35,6 +38,12 @@ func Init() error {
 			return err
 		}
 	}
+
+	// Set default db path
+	pathMutex.Lock()
+	dbPath = filepath.Join(dbDir, "app.db")
+	pathMutex.Unlock()
+
 	return nil
 }
 
@@ -43,7 +52,23 @@ func GetDataDir() string {
 }
 
 func GetDBPath() string {
-	return filepath.Join(dbDir, "app.db")
+	pathMutex.RLock()
+	defer pathMutex.RUnlock()
+	return dbPath
+}
+
+func SetDBPath(newPath string) error {
+	pathMutex.Lock()
+	defer pathMutex.Unlock()
+
+	// Ensure directory exists
+	dir := filepath.Dir(newPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	dbPath = newPath
+	return nil
 }
 
 func GetLogDir() string {
