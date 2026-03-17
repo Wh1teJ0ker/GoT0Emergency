@@ -1,3 +1,5 @@
+// Package executor provides command execution interface and implementations
+// Supports local execution and SSH remote execution modes
 package executor
 
 import (
@@ -8,14 +10,20 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SSHExecutor executes commands on a remote host via SSH
 type SSHExecutor struct {
-	client *ssh.Client
+	client *ssh.Client // SSH client connection
 }
 
+// NewSSHExecutor creates a new SSH executor instance
+// client: established SSH client connection
 func NewSSHExecutor(client *ssh.Client) *SSHExecutor {
 	return &SSHExecutor{client: client}
 }
 
+// Exec executes a command on the remote host via SSH
+// cmdStr: command string to execute
+// Returns: command stdout and error if execution fails
 func (e *SSHExecutor) Exec(cmdStr string) (string, error) {
 	if e.client == nil {
 		return "", log.Errorf("ssh client is nil")
@@ -39,7 +47,13 @@ func (e *SSHExecutor) Exec(cmdStr string) (string, error) {
 	return stdout.String(), nil
 }
 
-// Helper to create client (usually handled in session manager, but useful here for simple setup)
+// ConnectSSH creates a new SSH client connection
+// ip: remote host IP address or hostname
+// port: SSH port number
+// user: username for authentication
+// authMethods: list of SSH authentication methods
+// Returns: SSH client instance and error if connection fails
+// Note: Uses InsecureIgnoreHostKey() for MVP - consider adding host key verification for production
 func ConnectSSH(ip string, port int, user string, authMethods []ssh.AuthMethod) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            user,
@@ -71,7 +85,9 @@ func ConnectSSH(ip string, port int, user string, authMethods []ssh.AuthMethod) 
 	return client, nil
 }
 
-// keepAlive sends keepalive packets every 30 seconds to maintain the connection
+// keepAlive sends keepalive packets every 30 seconds to maintain the SSH connection
+// client: SSH client connection
+// ip, port: connection target for logging purposes
 func keepAlive(client *ssh.Client, ip string, port int) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()

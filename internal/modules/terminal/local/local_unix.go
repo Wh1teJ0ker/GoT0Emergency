@@ -1,6 +1,8 @@
 //go:build linux || darwin
 // +build linux darwin
 
+// Package local provides local terminal session implementation
+// Supports Windows ConPTY and Unix PTY for native terminal emulation
 package local
 
 import (
@@ -14,10 +16,10 @@ import (
 	"GoT0Emergency/internal/pkg/log"
 )
 
-// startUnixShell 在 Unix 系统上启动 shell
-// 返回: pty主设备, stdin(=ptmx), pty关闭器, cmd, proc, 错误
+// startUnixShell starts a shell on Unix systems using PTY
+// Returns: ptyx (stdout/stdin), closer, cmd, process, error
 func startUnixShell() (*os.File, *os.File, io.Closer, *exec.Cmd, *os.Process, error) {
-	// 获取默认 shell
+	// Get default shell
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/bash"
@@ -27,17 +29,17 @@ func startUnixShell() (*os.File, *os.File, io.Closer, *exec.Cmd, *os.Process, er
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
-	// 使用 pty 启动
+	// Start with pty
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		log.Error("Failed to start pty: " + err.Error())
 		return nil, nil, nil, nil, nil, errors.New("failed to start pty: " + err.Error())
 	}
 
-	// 在 Unix 上，ptmx 同时是 stdin 和 stdout
-	// pty.Start 返回的 ptmx 就是主设备文件
-	// 我们需要关闭它，所以返回 ptmx 作为 Closer
-	// proc 为 nil，因为我们使用 cmd 等待
+	// On Unix, ptmx is both stdin and stdout
+	// ptmx returned by pty.Start is the master device file
+	// We need to close it, so return ptmx as Closer
+	// proc is nil because we use cmd for Wait
 	return ptmx, ptmx, ptmx, cmd, nil, nil
 }
 
@@ -46,7 +48,9 @@ func startWindowsShell() (*os.File, *os.File, io.Closer, *exec.Cmd, *os.Process,
 	return nil, nil, nil, nil, nil, errors.New("windows shell not supported on unix")
 }
 
-// resizeUnixTerminal 调整 Unix 终端大小
+// resizeUnixTerminal resizes a Unix terminal
+// ptmx: pty master file descriptor
+// rows, cols: new terminal dimensions
 func resizeUnixTerminal(ptmx *os.File, rows, cols int) error {
 	return pty.Setsize(ptmx, &pty.Winsize{
 		Rows: uint16(rows),
@@ -56,7 +60,7 @@ func resizeUnixTerminal(ptmx *os.File, rows, cols int) error {
 	})
 }
 
-// Stub for Windows resize on Unix build
+// resizeWindowsTerminal is a stub for Unix build
 func resizeWindowsTerminal(_ *os.File, _, _ int) error {
 	return nil
 }

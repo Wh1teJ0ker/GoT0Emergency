@@ -11,7 +11,15 @@ import { PluginManager } from './pages/node/PluginManager';
 import { NodeManager } from './pages/node/NodeManager';
 import { LogsPage } from './pages/LogsPage';
 
-// Placeholder for future implementation
+/**
+ * Main application component
+ * Defines all application routes using React Router
+ */
+
+/**
+ * PlaceholderPage - Temporary placeholder for unimplemented pages
+ * @param title - Page title to display
+ */
 const PlaceholderPage = ({ title }: { title: string }) => (
     <PageContainer>
         <PageHeader title={title} description="此功能正在开发中。" />

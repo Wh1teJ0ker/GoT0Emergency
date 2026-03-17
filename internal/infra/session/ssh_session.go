@@ -1,3 +1,5 @@
+// Package session provides SSH session management functionality
+// Handles connection pooling, file transfer (SFTP), and remote port forwarding
 package session
 
 import (
@@ -16,20 +18,24 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SessionManager manages SSH connections to remote hosts
+// SessionManager manages SSH connections to remote hosts
 type SessionManager struct {
-	mu                sync.RWMutex
-	connections       map[int64]*ssh.Client
-	remoteListeners   map[int64]net.Listener
-	hostService       *host.Service
+	mu              sync.RWMutex
+	connections     map[int64]*ssh.Client // Active SSH connections by host ID
+	remoteListeners map[int64]net.Listener // Remote port listeners by host ID
+	hostService     *host.Service         // Host service for retrieving host info
 }
 
+// FileInfo represents a remote file entry
 type FileInfo struct {
-	Name    string `json:"name"`
-	Size    int64  `json:"size"`
-	IsDir   bool   `json:"is_dir"`
-	ModTime string `json:"mod_time"`
+	Name    string `json:"name"`    // File or directory name
+	Size    int64  `json:"size"`    // File size in bytes
+	IsDir   bool   `json:"is_dir"`  // True if directory
+	ModTime string `json:"mod_time"` // Last modification time (RFC3339 format)
 }
 
+// NewSessionManager creates a new session manager instance
 func NewSessionManager(hostService *host.Service) *SessionManager {
 	return &SessionManager{
 		connections: make(map[int64]*ssh.Client),
@@ -38,6 +44,9 @@ func NewSessionManager(hostService *host.Service) *SessionManager {
 	}
 }
 
+// Connect establishes an SSH connection to a host
+// hostID: the host unique identifier
+// Returns: error if connection fails
 func (sm *SessionManager) Connect(hostID int64) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -95,6 +104,10 @@ func (sm *SessionManager) Connect(hostID int64) error {
 	return nil
 }
 
+// ListFiles lists files in a remote directory
+// hostID: the host unique identifier
+// remotePath: the remote directory path
+// Returns: slice of FileInfo and error if operation fails
 func (sm *SessionManager) ListFiles(hostID int64, remotePath string) ([]FileInfo, error) {
 	client, err := sm.GetClient(hostID)
 	if err != nil {
@@ -131,6 +144,9 @@ func (sm *SessionManager) ListFiles(hostID int64, remotePath string) ([]FileInfo
 	return result, nil
 }
 
+// GetExecutor returns an SSH executor for a connected host
+// hostID: the host unique identifier
+// Returns: Executor interface and error if not connected
 func (sm *SessionManager) GetExecutor(hostID int64) (executor.Executor, error) {
 	client, err := sm.GetClient(hostID)
 	if err != nil {
@@ -139,6 +155,10 @@ func (sm *SessionManager) GetExecutor(hostID int64) (executor.Executor, error) {
 	return executor.NewSSHExecutor(client), nil
 }
 
+// GetClient returns the SSH client for a host
+// hostID: the host unique identifier
+// Returns: pointer to ssh.Client and error if retrieval fails
+// Note: Will attempt auto-connect if not already connected
 func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 	sm.mu.RLock()
 	client, ok := sm.connections[hostID]
@@ -166,8 +186,10 @@ func (sm *SessionManager) GetClient(hostID int64) (*ssh.Client, error) {
 	return client, nil
 }
 
-// getClientUnlocked is for internal use when the session manager's mutex is already held.
-// It does NOT auto-connect and assumes the caller has locked the mutex.
+// getClientUnlocked returns the SSH client without locking (internal use)
+// hostID: the host unique identifier
+// Returns: pointer to ssh.Client and error if not connected
+// Note: Does NOT auto-connect; caller must hold the mutex
 func (sm *SessionManager) getClientUnlocked(hostID int64) (*ssh.Client, error) {
 	client, ok := sm.connections[hostID]
 	if !ok {
@@ -177,6 +199,9 @@ func (sm *SessionManager) getClientUnlocked(hostID int64) (*ssh.Client, error) {
 	return client, nil
 }
 
+// Close closes an SSH connection and cleans up associated resources
+// hostID: the host unique identifier
+// Returns: always nil (for API consistency)
 func (sm *SessionManager) Close(hostID int64) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -192,6 +217,12 @@ func (sm *SessionManager) Close(hostID int64) error {
 	return nil
 }
 
+// ForwardRemotePort sets up remote port forwarding
+// Forwards traffic from remotePort on the remote host to localPort on the local machine
+// hostID: the host unique identifier
+// remotePort: the port to listen on the remote host
+// localPort: the local port to forward to
+// Returns: error if setup fails
 func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort int) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -256,6 +287,9 @@ func (sm *SessionManager) ForwardRemotePort(hostID int64, remotePort, localPort 
 	return nil
 }
 
+// IsConnected checks if a host is currently connected
+// hostID: the host unique identifier
+// Returns: true if connected, false otherwise
 func (sm *SessionManager) IsConnected(hostID int64) bool {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -263,6 +297,12 @@ func (sm *SessionManager) IsConnected(hostID int64) bool {
 	return ok
 }
 
+// UploadFile uploads a file from local to remote host via SFTP
+// hostID: the host unique identifier
+// localPath: path to the local file
+// remotePath: destination path on the remote host
+// resume: if true, resumes interrupted upload from checkpoint
+// Returns: error if upload fails
 func (sm *SessionManager) UploadFile(hostID int64, localPath, remotePath string, resume bool) error {
 	client, err := sm.GetClient(hostID)
 	if err != nil {
@@ -322,6 +362,10 @@ func (sm *SessionManager) UploadFile(hostID int64, localPath, remotePath string,
 	return nil
 }
 
+// RemoveFile deletes a file or directory on the remote host
+// hostID: the host unique identifier
+// remotePath: path to the remote file or directory
+// Returns: error if deletion fails
 func (sm *SessionManager) RemoveFile(hostID int64, remotePath string) error {
 	executor, err := sm.GetExecutor(hostID)
 	if err != nil {
@@ -339,6 +383,12 @@ func (sm *SessionManager) RemoveFile(hostID int64, remotePath string) error {
 	return nil
 }
 
+// DownloadFile downloads a file from remote host to local via SFTP
+// hostID: the host unique identifier
+// remotePath: path to the remote file
+// localPath: destination path on the local machine
+// resume: if true, resumes interrupted download from checkpoint
+// Returns: error if download fails
 func (sm *SessionManager) DownloadFile(hostID int64, remotePath, localPath string, resume bool) error {
 	client, err := sm.GetClient(hostID)
 	if err != nil {

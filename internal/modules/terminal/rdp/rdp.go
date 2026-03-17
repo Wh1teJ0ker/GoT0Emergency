@@ -1,3 +1,5 @@
+// Package rdp provides RDP (Remote Desktop Protocol) session management
+// Generates RDP configuration files and launches native RDP clients
 package rdp
 
 import (
@@ -8,18 +10,22 @@ import (
 	"runtime"
 )
 
+// RDPConfig represents RDP connection configuration
 type RDPConfig struct {
-	Host     string
-	Port     int
-	Username string
-	Password string // Note: RDP files don't support cleartext password usually, or it's hashed. We might skip password and let user enter it.
-	Width    int
-	Height   int
+	Host     string // Remote host address
+	Port     int    // RDP port (usually 3389)
+	Username string // Username for authentication
+	Password string // Password (note: RDP files typically don't store cleartext passwords)
+	Width    int    // Desktop width in pixels
+	Height   int    // Desktop height in pixels
 }
 
+// GenerateRDPFile creates an RDP configuration file
+// config: RDP connection settings
+// path: file path to write the RDP file
+// Returns: error if file write fails
+// RDP file format: key:type:value where types are i (integer), s (string), b (binary)
 func GenerateRDPFile(config RDPConfig, path string) error {
-	// RDP file format: key:type:value
-	// types: i (integer), s (string), b (binary)
 	content := log.Sprintf(`full address:s:%s:%d
 username:s:%s
 screen mode id:i:2
@@ -67,6 +73,13 @@ authentication level:i:2
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
+// LaunchRDP launches an RDP session with the given configuration
+// config: RDP connection settings
+// Returns: error if failed to generate RDP file or launch client
+// Creates a temporary .rdp file and launches the native RDP client:
+// - Windows: mstsc.exe
+// - macOS: open command (Microsoft Remote Desktop)
+// - Linux: xdg-open (generic handler)
 func LaunchRDP(config RDPConfig) error {
 	// Create a temporary .rdp file
 	tmpFile := filepath.Join(os.TempDir(), log.Sprintf("got0_%s_%d.rdp", config.Host, config.Port))

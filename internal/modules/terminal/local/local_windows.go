@@ -1,6 +1,8 @@
 //go:build windows
 // +build windows
 
+// Package local provides local terminal session implementation
+// Supports Windows ConPTY and Unix PTY for native terminal emulation
 package local
 
 import (
@@ -17,7 +19,8 @@ import (
 // Windows ConPTY API definitions
 // Since we use github.com/ActiveState/termtest/conpty, we don't need manual syscalls anymore.
 
-// startWindowsShell implementation for Windows using ConPTY if available, falling back to pipes
+// startWindowsShell starts a Windows shell using ConPTY if available, falling back to pipes
+// Returns: ptmx (stdout), stdin, closer, cmd, process, error
 func startWindowsShell() (*os.File, *os.File, io.Closer, *exec.Cmd, *os.Process, error) {
 	// 1. Try to start with ConPTY (Windows 10 1809+)
 	ptmx, stdin, closer, cmd, proc, err := startConPTY()
@@ -119,7 +122,9 @@ func startConPTY() (*os.File, *os.File, io.Closer, *exec.Cmd, *os.Process, error
 	return outFile, inFile, ptyCloser, nil, process, nil
 }
 
-// Helper to resize
+// resizeWindowsTerminal resizes a Windows terminal
+// ptmx: pty master file descriptor
+// rows, cols: new terminal dimensions
 func resizeWindowsTerminal(ptmx *os.File, rows, cols int) error {
 	if ptmx == nil {
 		return nil
@@ -131,19 +136,20 @@ func resizeWindowsTerminal(ptmx *os.File, rows, cols int) error {
 	return nil
 }
 
-// Stub for Unix resize on Windows build
+// resizeUnixTerminal is a stub for Windows build
 func resizeUnixTerminal(_ *os.File, _, _ int) error {
 	return nil
 }
 
-// conPtyWrapper implements io.Closer
+// conPtyWrapper implements io.Closer for ConPty
 type conPtyWrapper struct {
 	cpty *conpty.ConPty
 }
 
+// Close closes the ConPty instance
 func (c *conPtyWrapper) Close() error {
-	// Note: We are leaking map entries here. 
-	// To fix properly we need to track FDs. 
+	// Note: We are leaking map entries here.
+	// To fix properly we need to track FDs.
 	// For now, this is acceptable for MVP.
 	return c.cpty.Close()
 }

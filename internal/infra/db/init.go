@@ -1,3 +1,5 @@
+// Package db provides database initialization and connection management
+// Uses SQLite3 with WAL (Write-Ahead Logging) mode for concurrent read support
 package db
 
 import (
@@ -11,11 +13,16 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// DB is the global database connection handle
 var DB *sql.DB
 
+// schema contains the embedded SQL schema definition from schema.sql
 //go:embed schema.sql
 var schema string
 
+// Init initializes the SQLite database connection
+// Sets up WAL mode and connection pooling for optimal performance
+// Returns: error if database initialization fails
 func Init() error {
 	dbPath := path.GetDBPath()
 	log.Info("Initializing database", "path", dbPath)
@@ -43,6 +50,8 @@ func Init() error {
 	return migrate()
 }
 
+// migrate executes the schema definition to create/update tables
+// Returns: error if schema execution fails
 func migrate() error {
 	_, err := DB.Exec(schema)
 	if err != nil {
@@ -51,6 +60,8 @@ func migrate() error {
 	return nil
 }
 
+// Close closes the database connection
+// Should be called on application shutdown
 func Close() {
 	if DB != nil {
 		DB.Close()

@@ -1,3 +1,5 @@
+// Package node provides Node agent build and plugin management functionality
+// Handles creating, building, and deploying monitoring agents to remote hosts
 package node
 
 import (
@@ -10,17 +12,20 @@ import (
 	"GoT0Emergency/internal/pkg/path"
 )
 
+// Plugin represents a Node plugin module
 type Plugin struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Tag         string `json:"tag"`
-	Path        string `json:"path"`
+	Name        string `json:"name"`        // Plugin name
+	Description string `json:"description"` // Plugin description
+	Tag         string `json:"tag"`         // Build tag for compilation
+	Path        string `json:"path"`        // File system path to plugin
 }
 
+// Service provides Node agent build and plugin operations
 type Service struct {
-	projectRoot string
+	projectRoot string // Project root directory path
 }
 
+// NewService creates a new node service instance
 func NewService() *Service {
 	root, _ := os.Getwd()
 	// If running tests, we might need to adjust, but for now default to CWD
@@ -34,6 +39,8 @@ func (s *Service) SetProjectRoot(path string) {
 	s.projectRoot = path
 }
 
+// GetPlugins retrieves all available plugin modules
+// Returns: slice of Plugin structs and error if modules directory cannot be read
 func (s *Service) GetPlugins() ([]Plugin, error) {
 	// Assume running from project root
 	moduleDir := filepath.Join(s.projectRoot, "cmd/node/modules")
@@ -66,6 +73,10 @@ func (s *Service) GetPlugins() ([]Plugin, error) {
 	return plugins, nil
 }
 
+// CreatePlugin creates a new plugin module with the given name and description
+// name: plugin name (must be alphanumeric, lowercase)
+// description: plugin description
+// Returns: error if validation fails or file creation fails
 func (s *Service) CreatePlugin(name, description string) error {
 	// 1. Validate name (alphanumeric, lowercase)
 	name = strings.ToLower(strings.TrimSpace(name))
@@ -98,6 +109,9 @@ func (s *Service) CreatePlugin(name, description string) error {
 	return nil
 }
 
+// GetPluginSource retrieves the source code of a plugin
+// name: plugin name
+// Returns: plugin source code as string and error if read fails
 func (s *Service) GetPluginSource(name string) (string, error) {
 	// 1. Construct path
 	name = strings.ToLower(strings.TrimSpace(name))
@@ -115,6 +129,10 @@ func (s *Service) GetPluginSource(name string) (string, error) {
 	return string(content), nil
 }
 
+// SavePluginSource saves new source code for a plugin
+// name: plugin name
+// content: new source code content
+// Returns: error if write fails or path is invalid
 func (s *Service) SavePluginSource(name, content string) error {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
@@ -219,6 +237,8 @@ func (s *Service) registerInMain(name string) error {
 	return os.WriteFile(mainPath, []byte(strings.Join(newLines, "\n")), 0644)
 }
 
+// GetBuiltNodes returns a list of built Node agent binaries
+// Returns: slice of node binary filenames
 func (s *Service) GetBuiltNodes() ([]string, error) {
 	nodeDir := path.GetNodeDir()
 	entries, err := os.ReadDir(nodeDir)
@@ -235,6 +255,11 @@ func (s *Service) GetBuiltNodes() ([]string, error) {
 	return nodes, nil
 }
 
+// BuildNode builds a Node agent with specified features and platform
+// features: list of feature tags to include
+// targetOS: target operating system (linux, windows, darwin)
+// targetArch: target architecture (amd64, arm64, etc.)
+// Returns: success message with build info and error if build fails
 func (s *Service) BuildNode(features []string, targetOS string, targetArch string) (string, error) {
 	outputPath, err := s.Build(features, targetOS, targetArch)
 	if err != nil {
@@ -252,6 +277,11 @@ func (s *Service) BuildNode(features []string, targetOS string, targetArch strin
 	return msg, nil
 }
 
+// Build compiles a Node agent binary with specified features and platform
+// features: list of feature tags to include (must start with "feat_")
+// targetOS: target operating system (linux, windows, darwin)
+// targetArch: target architecture (amd64, arm64, etc.)
+// Returns: path to built binary and error if compilation fails
 func (s *Service) Build(features []string, targetOS string, targetArch string) (string, error) {
 	// Security check
 	for _, f := range features {

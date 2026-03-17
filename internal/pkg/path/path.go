@@ -1,3 +1,5 @@
+// Package path provides centralized path management for the application
+// Handles data directory, database path, log directory, and other runtime paths
 package path
 
 import (
@@ -7,17 +9,19 @@ import (
 )
 
 var (
-	rootDir   string
-	dataDir   string
-	dbDir     string
-	dbPath    string
-	logDir    string
-	sshDir    string
-	tmpDir    string
-	nodeDir   string
-	pathMutex sync.RWMutex
+	rootDir   string      // Project root directory
+	dataDir   string      // Data directory (data/)
+	dbDir     string      // Database directory (data/db/)
+	dbPath    string      // Database file path
+	logDir    string      // Log directory (data/logs/)
+	sshDir    string      // SSH keys directory (data/ssh/)
+	tmpDir    string      // Temporary directory (data/tmp/)
+	nodeDir   string      // Node agent builds directory (data/nodes/)
+	pathMutex sync.RWMutex // Mutex for thread-safe path operations
 )
 
+// Init initializes all runtime directories
+// Creates necessary directory structure under the data directory
 func Init() error {
 	var err error
 	rootDir, err = os.Getwd()
@@ -47,16 +51,21 @@ func Init() error {
 	return nil
 }
 
+// GetDataDir returns the data directory path
 func GetDataDir() string {
 	return dataDir
 }
 
+// GetDBPath returns the database file path
 func GetDBPath() string {
 	pathMutex.RLock()
 	defer pathMutex.RUnlock()
 	return dbPath
 }
 
+// SetDBPath sets a custom database path
+// newPath: the new database file path
+// Returns: error if failed to create the directory
 func SetDBPath(newPath string) error {
 	pathMutex.Lock()
 	defer pathMutex.Unlock()
@@ -71,18 +80,22 @@ func SetDBPath(newPath string) error {
 	return nil
 }
 
+// GetLogDir returns the log directory path
 func GetLogDir() string {
 	return logDir
 }
 
+// GetSSHDir returns the SSH keys directory path
 func GetSSHDir() string {
 	return sshDir
 }
 
+// GetTmpDir returns the temporary directory path
 func GetTmpDir() string {
 	return tmpDir
 }
 
+// GetNodeDir returns the Node agent builds directory path
 func GetNodeDir() string {
 	return nodeDir
 }

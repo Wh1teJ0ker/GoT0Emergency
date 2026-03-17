@@ -1,3 +1,6 @@
+// Package log provides centralized logging functionality for the application
+// Uses Go's standard slog package with JSON output
+// Logs are written to dated files under data/logs/
 package log
 
 import (
@@ -12,16 +15,18 @@ import (
 
 var logger *slog.Logger
 
-// Wrapper for fmt.Errorf
+// Errorf wraps fmt.Errorf for consistent error formatting
 func Errorf(format string, args ...any) error {
 	return fmt.Errorf(format, args...)
 }
 
-// Wrapper for fmt.Sprintf
+// Sprintf wraps fmt.Sprintf for string formatting
 func Sprintf(format string, args ...any) string {
 	return fmt.Sprintf(format, args...)
 }
 
+// Init initializes the logging system
+// Creates a JSON log file for the current date under data/logs/
 func Init() error {
 	logFile := GetLogPath()
 	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -39,24 +44,28 @@ func Init() error {
 	return nil
 }
 
+// Info logs an informational message with key-value pairs
 func Info(msg string, args ...any) {
 	if logger != nil {
 		logger.Info(msg, args...)
 	}
 }
 
+// Error logs an error message with key-value pairs
 func Error(msg string, args ...any) {
 	if logger != nil {
 		logger.Error(msg, args...)
 	}
 }
 
+// Debug logs a debug message with key-value pairs
 func Debug(msg string, args ...any) {
 	if logger != nil {
 		logger.Debug(msg, args...)
 	}
 }
 
+// With returns a logger with the given context
 func With(args ...any) *slog.Logger {
 	if logger != nil {
 		return logger.With(args...)
@@ -64,12 +73,14 @@ func With(args ...any) *slog.Logger {
 	return slog.Default()
 }
 
+// GetLogPath returns the log file path for the current date
 func GetLogPath() string {
 	today := time.Now().Format("2006-01-02")
 	return filepath.Join(path.GetLogDir(), fmt.Sprintf("app-%s.log", today))
 }
 
 // GetLogFiles returns a list of available log files (dates)
+// Returns: slice of date strings extracted from filenames
 func GetLogFiles() ([]string, error) {
 	logDir := path.GetLogDir()
 	files, err := os.ReadDir(logDir)
@@ -89,6 +100,10 @@ func GetLogFiles() ([]string, error) {
 	return dates, nil
 }
 
+// ReadLogsByDate reads log entries for a specific date
+// date: date string in format YYYY-MM-DD
+// limit: maximum number of lines to return (0 for all)
+// Returns: slice of log lines
 func ReadLogsByDate(date string, limit int) ([]string, error) {
 	logPath := filepath.Join(path.GetLogDir(), fmt.Sprintf("app-%s.log", date))
 	content, err := os.ReadFile(logPath)
@@ -118,11 +133,14 @@ func ReadLogsByDate(date string, limit int) ([]string, error) {
 	return result, nil
 }
 
+// ReadLogs reads log entries for the current date
+// limit: maximum number of lines to return (0 for all)
 func ReadLogs(limit int) ([]string, error) {
 	today := time.Now().Format("2006-01-02")
 	return ReadLogsByDate(today, limit)
 }
 
+// ClearLogs truncates the current log file to zero size
 func ClearLogs() error {
 	logPath := GetLogPath()
 	return os.Truncate(logPath, 0)

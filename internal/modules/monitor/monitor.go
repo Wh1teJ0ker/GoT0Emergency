@@ -1,3 +1,6 @@
+// Package monitor provides system monitoring and metrics collection functionality
+// Supports both local host monitoring and remote host monitoring via SSH
+// Collects CPU, memory, disk, network, process, and hardware information
 package monitor
 
 import (
@@ -28,118 +31,133 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
+// HostStatus contains comprehensive host system status information
 type HostStatus struct {
-	System   SystemInfo   `json:"system"`
-	CPU      CPUInfo      `json:"cpu"`
-	Memory   MemoryInfo   `json:"memory"`
-	Disk     DiskInfo     `json:"disk"`
-	Network  NetworkInfo  `json:"network"`
-	Process  ProcessInfo  `json:"process"`
-	Hardware HardwareInfo `json:"hardware"`
+	System   SystemInfo   `json:"system"`   // System information
+	CPU      CPUInfo      `json:"cpu"`      // CPU statistics
+	Memory   MemoryInfo   `json:"memory"`   // Memory statistics
+	Disk     DiskInfo     `json:"disk"`     // Disk statistics
+	Network  NetworkInfo  `json:"network"`  // Network statistics
+	Process  ProcessInfo  `json:"process"`  // Process information
+	Hardware HardwareInfo `json:"hardware"` // Hardware information
 }
 
+// SystemInfo contains basic system information
 type SystemInfo struct {
-	Hostname    string `json:"hostname"`
-	OS          string `json:"os"`
-	Platform    string `json:"platform"`
-	KernelArch  string `json:"kernel_arch"`
-	BootTime    uint64 `json:"boot_time"`
-	Uptime      uint64 `json:"uptime"`
-	UptimeStr   string `json:"uptime_str"`
-	CurrentUser string `json:"current_user"`
+	Hostname    string `json:"hostname"`    // Hostname
+	OS          string `json:"os"`          // Operating system
+	Platform    string `json:"platform"`    // Platform name and version
+	KernelArch  string `json:"kernel_arch"` // Kernel architecture
+	BootTime    uint64 `json:"boot_time"`   // Boot time (Unix timestamp)
+	Uptime      uint64 `json:"uptime"`      // Uptime in seconds
+	UptimeStr   string `json:"uptime_str"`  // Human-readable uptime
+	CurrentUser string `json:"current_user"` // Current logged-in user
 }
 
+// CPUInfo contains CPU statistics
 type CPUInfo struct {
-	Model         string    `json:"model"`
-	CoresLogical  int       `json:"cores_logical"`
-	CoresPhysical int       `json:"cores_physical"`
-	UsageTotal    float64   `json:"usage_total"`
-	UsagePerCore  []float64 `json:"usage_per_core"`
-	LoadAvg       string    `json:"load_avg"`
-	Frequency     float64   `json:"frequency"` // MHz
+	Model         string    `json:"model"`         // CPU model name
+	CoresLogical  int       `json:"cores_logical"`  // Number of logical cores
+	CoresPhysical int       `json:"cores_physical"` // Number of physical cores
+	UsageTotal    float64   `json:"usage_total"`    // Total CPU usage percentage
+	UsagePerCore  []float64 `json:"usage_per_core"` // Per-core usage percentages
+	LoadAvg       string    `json:"load_avg"`       // Load average (1m, 5m, 15m)
+	Frequency     float64   `json:"frequency"`      // CPU frequency in MHz
 }
 
+// MemoryInfo contains memory statistics
 type MemoryInfo struct {
-	Total     uint64  `json:"total"`
-	Used      uint64  `json:"used"`
-	Free      uint64  `json:"free"`
-	Usage     float64 `json:"usage"`
-	SwapTotal uint64  `json:"swap_total"`
-	SwapUsed  uint64  `json:"swap_used"`
+	Total     uint64  `json:"total"`     // Total memory in bytes
+	Used      uint64  `json:"used"`      // Used memory in bytes
+	Free      uint64  `json:"free"`      // Available memory in bytes
+	Usage     float64 `json:"usage"`     // Memory usage percentage
+	SwapTotal uint64  `json:"swap_total"` // Total swap in bytes
+	SwapUsed  uint64  `json:"swap_used"`  // Used swap in bytes
 }
 
+// DiskInfo contains disk statistics
 type DiskInfo struct {
-	Partitions []PartitionInfo `json:"partitions"`
-	Total      uint64          `json:"total"`
-	Used       uint64          `json:"used"`
-	Usage      float64         `json:"usage"`
-	ReadBytes  uint64          `json:"read_bytes"`
-	WriteBytes uint64          `json:"write_bytes"`
-	ReadOps    uint64          `json:"read_ops"`
-	WriteOps   uint64          `json:"write_ops"`
+	Partitions []PartitionInfo `json:"partitions"` // Partition information
+	Total      uint64          `json:"total"`      // Total disk space in bytes
+	Used       uint64          `json:"used"`       // Used disk space in bytes
+	Usage      float64         `json:"usage"`      // Disk usage percentage
+	ReadBytes  uint64          `json:"read_bytes"`  // Total bytes read
+	WriteBytes uint64          `json:"write_bytes"` // Total bytes written
+	ReadOps    uint64          `json:"read_ops"`    // Total read operations
+	WriteOps   uint64          `json:"write_ops"`   // Total write operations
 }
 
+// PartitionInfo contains partition information
 type PartitionInfo struct {
-	Path   string  `json:"path"`
-	FSType string  `json:"fstype"`
-	Total  uint64  `json:"total"`
-	Used   uint64  `json:"used"`
-	Usage  float64 `json:"usage"`
+	Path   string  `json:"path"`   // Mount point
+	FSType string  `json:"fstype"` // Filesystem type
+	Total  uint64  `json:"total"`  // Total space in bytes
+	Used   uint64  `json:"used"`   // Used space in bytes
+	Usage  float64 `json:"usage"`  // Usage percentage
 }
 
+// NetworkInfo contains network statistics
 type NetworkInfo struct {
-	Interfaces     []InterfaceInfo `json:"interfaces"`
-	TotalRx        uint64          `json:"total_rx"`
-	TotalTx        uint64          `json:"total_tx"`
-	TCPConnections int             `json:"tcp_connections"`
-	UDPConnections int             `json:"udp_connections"`
-	ListenPorts    []int           `json:"listen_ports"`
+	Interfaces     []InterfaceInfo `json:"interfaces"`     // Network interfaces
+	TotalRx        uint64          `json:"total_rx"`       // Total bytes received
+	TotalTx        uint64          `json:"total_tx"`       // Total bytes transmitted
+	TCPConnections int             `json:"tcp_connections"` // Number of TCP connections
+	UDPConnections int             `json:"udp_connections"` // Number of UDP connections
+	ListenPorts    []int           `json:"listen_ports"`    // Listening TCP ports
 }
 
+// InterfaceInfo contains network interface information
 type InterfaceInfo struct {
-	Name string `json:"name"`
-	IP   string `json:"ip"`
-	Rx   uint64 `json:"rx"`
-	Tx   uint64 `json:"tx"`
+	Name string `json:"name"` // Interface name
+	IP   string `json:"ip"`   // IP address
+	Rx   uint64 `json:"rx"`   // Bytes received
+	Tx   uint64 `json:"tx"`   // Bytes transmitted
 }
 
+// ProcessInfo contains process information
 type ProcessInfo struct {
-	Total int           `json:"total"`
-	List  []ProcessItem `json:"list"`
+	Total int           `json:"total"` // Total number of processes
+	List  []ProcessItem `json:"list"`  // Top processes by memory usage
 }
 
+// ProcessItem contains individual process information
 type ProcessItem struct {
-	Name string  `json:"name"`
-	PID  int32   `json:"pid"`
-	PPID int32   `json:"ppid"`
-	Path string  `json:"path"`
-	CPU  float64 `json:"cpu"`
-	Mem  float64 `json:"mem"`
+	Name string  `json:"name"` // Process name
+	PID  int32   `json:"pid"`  // Process ID
+	PPID int32   `json:"ppid"` // Parent process ID
+	Path string  `json:"path"` // Executable path
+	CPU  float64 `json:"cpu"`  // CPU usage percentage
+	Mem  float64 `json:"mem"`  // Memory usage percentage
 }
 
+// HardwareInfo contains hardware information
 type HardwareInfo struct {
-	Motherboard string `json:"motherboard"`
-	BIOS        string `json:"bios"`
-	BaseBoard   string `json:"baseboard"`
-	Chassis     string `json:"chassis"`
-	MemoryModel string `json:"memory_model"`
-	DiskModel   string `json:"disk_model"`
+	Motherboard string `json:"motherboard"` // Motherboard model
+	BIOS        string `json:"bios"`        // BIOS version
+	BaseBoard   string `json:"baseboard"`   // Base board model
+	Chassis     string `json:"chassis"`     // Chassis type
+	MemoryModel string `json:"memory_model"` // Memory information
+	DiskModel   string `json:"disk_model"`   // Disk model
 }
 
-// --- Service ---
-
+// Service provides host monitoring functionality
 type Service struct {
-	sessionManager *session.SessionManager
-	localExecutor  *executor.LocalExecutor
-	hostService    *hostMod.Service
-	settings       *settings.Service
-	stopChan       chan struct{}
-	statusCache    map[int64]*HostStatus
-	mu             sync.RWMutex
-	pdhQuery       *pdh.PDHQuery // PDH query handle for Windows Queue Length
-	pdhCPUQuery    *pdh.PDHQuery // PDH query handle for Windows CPU Utility
+	sessionManager *session.SessionManager // SSH session manager
+	localExecutor  *executor.LocalExecutor // Local command executor
+	hostService    *hostMod.Service        // Host service for retrieving host info
+	settings       *settings.Service       // Settings service for retention policy
+	stopChan       chan struct{}           // Channel for stopping background goroutines
+	statusCache    map[int64]*HostStatus   // Cache of host status by host ID
+	mu             sync.RWMutex            // Mutex for protecting statusCache
+	pdhQuery       *pdh.PDHQuery           // PDH query for Windows Processor Queue Length
+	pdhCPUQuery    *pdh.PDHQuery           // PDH query for Windows CPU usage
 }
 
+// NewService creates a new monitor service instance
+// sm: session manager for SSH connections
+// le: local executor for local commands
+// hs: host service for host information
+// set: settings service for configuration
 func NewService(sm *session.SessionManager, le *executor.LocalExecutor, hs *hostMod.Service, set *settings.Service) *Service {
 	s := &Service{
 		sessionManager: sm,

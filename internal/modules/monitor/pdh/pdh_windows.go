@@ -1,6 +1,8 @@
 //go:build windows
 // +build windows
 
+// Package pdh provides Windows Performance Data Helper (PDH) API wrapper
+// Used for collecting system performance metrics on Windows platforms
 package pdh
 
 import (
@@ -18,12 +20,15 @@ var (
 	procPdhGetFormattedCounterValue = modpdh.NewProc("PdhGetFormattedCounterValue")
 )
 
+// PDHQuery represents a Windows PDH performance counter query
 type PDHQuery struct {
-	query   syscall.Handle
-	counter syscall.Handle
+	query   syscall.Handle // Query handle
+	counter syscall.Handle // Counter handle
 }
 
-// NewPDHQuery creates a new query for the specified counter path
+// NewPDHQuery creates a new PDH query for the specified counter path
+// counterPath: PDH counter path (e.g., "\System\Processor Queue Length")
+// Returns: PDHQuery instance and error if counter cannot be opened
 func NewPDHQuery(counterPath string) (*PDHQuery, error) {
 	var query syscall.Handle
 	// 0, 0, &query
@@ -52,12 +57,16 @@ func NewPDHQuery(counterPath string) (*PDHQuery, error) {
 	return &PDHQuery{query: query, counter: counter}, nil
 }
 
+// NewProcessorQueueLengthQuery creates a PDH query for processor queue length
+// Returns: PDHQuery for "\System\Processor Queue Length" counter
 func NewProcessorQueueLengthQuery() (*PDHQuery, error) {
 	return NewPDHQuery("\\System\\Processor Queue Length")
 }
 
-// NewProcessorUtilityQuery attempts to open the Processor Utility counter (Task Manager style)
-// Fallbacks to Processor Time if Utility is not available (older Windows)
+// NewProcessorUtilityQuery creates a PDH query for processor utility percentage
+// Attempts to use "Processor Utility" counter (Task Manager style) first
+// Falls back to "Processor Time" on older Windows versions
+// Returns: PDHQuery instance and error if both counters fail
 func NewProcessorUtilityQuery() (*PDHQuery, error) {
 	// Try Processor Information first (Win8+)
 	// Note: We use _Total instance
@@ -70,6 +79,8 @@ func NewProcessorUtilityQuery() (*PDHQuery, error) {
 	return NewPDHQuery("\\Processor(_Total)\\% Processor Time")
 }
 
+// Collect collects the current counter value
+// Returns: counter value as float64 and error if collection fails
 func (q *PDHQuery) Collect() (float64, error) {
 	r, _, err := procPdhCollectQueryData.Call(uintptr(q.query))
 	if r != 0 {
@@ -93,14 +104,11 @@ func (q *PDHQuery) Collect() (float64, error) {
 	return value.DoubleValue, nil
 }
 
-// PDH_FMT_COUNTERVALUE structure layout:
-// DWORD CStatus;
-// union { ... double doubleValue ... };
-// On 64-bit Go, struct fields are aligned.
-// uint32 is 4 bytes. float64 is 8 bytes.
-// So there will be 4 bytes padding after CStatus.
+// PDH_FMT_COUNTERVALUE_DOUBLE represents a PDH counter value in double-precision format
+// Layout matches Windows PDH_FMT_COUNTERVALUE structure for 64-bit:
+// DWORD CStatus; + 4 bytes padding + double doubleValue
 type PDH_FMT_COUNTERVALUE_DOUBLE struct {
-	CStatus     uint32
-	_           uint32 // Padding
-	DoubleValue float64
+	CStatus     uint32  // Counter status code
+	_           uint32  // Padding for alignment
+	DoubleValue float64 // Counter value
 }

@@ -1,3 +1,5 @@
+// Package ssh provides SSH-based terminal session implementation
+// Handles remote terminal sessions via SSH with PTY support
 package ssh
 
 import (
@@ -10,14 +12,21 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SSHTerminal represents an SSH terminal session
 type SSHTerminal struct {
-	session *ssh.Session
-	stdin   io.WriteCloser
-	stdout  io.Reader
-	ctx     context.Context
-	id      string
+	session *ssh.Session    // SSH session
+	stdin   io.WriteCloser  // Standard input pipe
+	stdout  io.Reader       // Standard output pipe
+	ctx     context.Context // Context for event emission
+	id      string          // Terminal session identifier
 }
 
+// NewSSHTerminal creates a new SSH terminal session
+// ctx: application context for event emission
+// client: SSH client connection
+// id: unique terminal identifier
+// rows, cols: initial terminal dimensions
+// Returns: SSHTerminal instance and error if session creation fails
 func NewSSHTerminal(ctx context.Context, client *ssh.Client, id string, rows, cols int) (*SSHTerminal, error) {
 	session, err := client.NewSession()
 	if err != nil {
@@ -68,6 +77,7 @@ func NewSSHTerminal(ctx context.Context, client *ssh.Client, id string, rows, co
 	return t, nil
 }
 
+// readLoop continuously reads from stdout and emits data to frontend
 func (t *SSHTerminal) readLoop() {
 	buf := make([]byte, 1024)
 	for {
@@ -87,18 +97,26 @@ func (t *SSHTerminal) readLoop() {
 	}
 }
 
+// Write sends data to the terminal (user input)
+// data: bytes to write
+// Returns: number of bytes written and error if write fails
 func (t *SSHTerminal) Write(data []byte) (int, error) {
 	return t.stdin.Write(data)
 }
 
+// Resize changes the terminal dimensions
+// rows, cols: new terminal size
+// Returns: error if resize fails
 func (t *SSHTerminal) Resize(rows, cols int) error {
 	return t.session.WindowChange(rows, cols)
 }
 
+// Close closes the terminal session
 func (t *SSHTerminal) Close() error {
 	return t.session.Close()
 }
 
+// Wait waits for the terminal process to exit
 func (t *SSHTerminal) Wait() error {
 	return t.session.Wait()
 }
