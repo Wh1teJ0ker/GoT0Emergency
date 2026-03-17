@@ -95,8 +95,4 @@ wails build
 
 ***
 
-##
-
-***
-
 <p align="center">⭐ 如果觉得有用，请给一个 Star！</p>
