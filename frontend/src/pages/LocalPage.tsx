@@ -113,7 +113,7 @@ export function LocalPage() {
                         </div>
 
                         {/* Terminal Content */}
-                        <div className="flex-1 p-6 overflow-hidden">
+                        <div className="flex-1 p-0 overflow-hidden">
                             {terminals.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                                     <Terminal size={48} className="mb-4 opacity-50" />
@@ -132,20 +132,8 @@ export function LocalPage() {
                                             activeTerminalId === term.id ? "block" : "hidden"
                                         )}
                                     >
-                                        {/* Terminal Header */}
-                                        <div className="h-9 bg-[#1e1e1e] border-b border-zinc-800 flex items-center px-4 justify-between select-none">
-                                            <div className="flex items-center gap-2">
-                                                <Terminal size={14} className="text-zinc-400" />
-                                                <span className="text-xs text-zinc-400 font-mono">{term.name}</span>
-                                            </div>
-                                            <div className="flex gap-1.5 opacity-50 hover:opacity-100 transition-opacity">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                                                <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                                            </div>
-                                        </div>
                                         {/* Terminal Body */}
-                                        <div className="flex-1 p-3 relative">
+                                        <div className="w-full h-full relative p-2">
                                             <XtermTerminal key={term.id} hostId={term.hostId} />
                                         </div>
                                     </div>

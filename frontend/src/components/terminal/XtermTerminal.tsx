@@ -32,7 +32,7 @@ export function XtermTerminal({ hostId, onClose }: XtermTerminalProps) {
         const term = new Terminal({
             cursorBlink: true,
             theme: {
-                background: '#1e1e1e', // Updated to VS Code style dark
+                background: '#1e1e1e',
                 foreground: '#cccccc',
                 cursor: '#ffffff',
                 selectionBackground: '#444444',
@@ -53,14 +53,30 @@ export function XtermTerminal({ hostId, onClose }: XtermTerminalProps) {
                 brightCyan: '#29b8db',
                 brightWhite: '#e5e5e5',
             },
-            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+
+            // 中文终端优先
+            fontFamily: [
+                '"Sarasa Term SC"',
+                '"Sarasa Mono SC"',
+                '"Cascadia Mono"',
+                '"JetBrains Mono"',
+                'Consolas',
+                '"DejaVu Sans Mono"',
+                'monospace'
+            ].join(', '),
+
             fontSize: 14,
-            fontWeight: 'bold', // Forced bold
-            fontWeightBold: '900', // Extra bold
-            lineHeight: 1.2,
+            fontWeight: '400',
+            fontWeightBold: '700',
+            lineHeight: 1.15,
             letterSpacing: 0,
-            scrollback: 5000, // Limit scrollback for memory optimization
-            allowProposedApi: true,
+
+            // 可读性和终端线条字符
+            minimumContrastRatio: 4.5,
+            customGlyphs: true,
+
+            scrollback: 5000,
+            allowProposedApi: false,
             fastScrollModifier: 'alt',
             scrollOnUserInput: true,
         });
